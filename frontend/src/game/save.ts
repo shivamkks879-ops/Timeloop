@@ -5,7 +5,6 @@ import { storage } from "@/src/utils/storage";
 
 import { LEVELS } from "./levels";
 import type { LevelSave, SaveData } from "./types";
-
 const KEY = "tle.save.v1";
 
 function emptySave(): SaveData {
@@ -13,7 +12,17 @@ function emptySave(): SaveData {
   for (const l of LEVELS) {
     levels[l.id] = { completed: false, bestEchoes: Infinity, grade: null, stars: 0 };
   }
-  return { levels, removeAds: false, audioOn: true, hapticsOn: true };
+  return {
+    levels,
+    removeAds: false,
+    audioOn: true,
+    hapticsOn: true,
+    oneThumb: false,
+    screenShake: true,
+    selectedSkin: "cyan",
+    unlockedSkins: ["cyan"],
+    achievements: [],
+  };
 }
 
 // In-memory cache so screens can read synchronously after first load.
@@ -71,6 +80,18 @@ export async function recordLevelResult(
     grade: better ? grade : prev.grade,
     stars: Math.max(prev.stars, stars),
   };
+  // Auto-unlock any newly-earned skins and achievements based on updated
+  // progress. Both lookups are pure functions of the save data.
+  const { unlockedByProgress } = await import("./skins");
+  const newSkins = unlockedByProgress(data);
+  for (const id of newSkins) {
+    if (!data.unlockedSkins.includes(id)) data.unlockedSkins = [...data.unlockedSkins, id];
+  }
+  const { earnedAchievements } = await import("./achievements");
+  const earned = earnedAchievements(data);
+  for (const id of earned) {
+    if (!data.achievements.includes(id)) data.achievements = [...data.achievements, id];
+  }
   await persistSave(data);
   return data;
 }
@@ -96,4 +117,36 @@ export async function setRemoveAds(on: boolean) {
   const data = await loadSave();
   data.removeAds = on;
   await persistSave(data);
+}
+
+export async function setOneThumb(on: boolean) {
+  const data = await loadSave();
+  data.oneThumb = on;
+  await persistSave(data);
+}
+export async function setScreenShake(on: boolean) {
+  const data = await loadSave();
+  data.screenShake = on;
+  await persistSave(data);
+}
+export async function setSelectedSkin(id: string) {
+  const data = await loadSave();
+  data.selectedSkin = id;
+  await persistSave(data);
+}
+export async function unlockSkin(id: string) {
+  const data = await loadSave();
+  if (!data.unlockedSkins.includes(id)) {
+    data.unlockedSkins = [...data.unlockedSkins, id];
+    await persistSave(data);
+  }
+  return data;
+}
+export async function unlockAchievement(id: string) {
+  const data = await loadSave();
+  if (!data.achievements.includes(id)) {
+    data.achievements = [...data.achievements, id];
+    await persistSave(data);
+  }
+  return data;
 }

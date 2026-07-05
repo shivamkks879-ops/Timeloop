@@ -70,6 +70,9 @@ export default function RootLayout() {
         setSfxEnabled(save.audioOn);
         setMusicEnabled(save.audioOn);
         if (save.audioOn) startMusic();
+        // Mirror the persisted haptics flag into the in-memory helper.
+        const { setHapticsEnabled } = await import("@/src/game/haptics");
+        setHapticsEnabled(save.hapticsOn);
       } catch (e) {
         if (__DEV__) console.warn("[audio] init failed", e);
       }

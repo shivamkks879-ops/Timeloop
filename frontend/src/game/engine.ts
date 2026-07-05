@@ -52,6 +52,7 @@ export interface EngineState {
   collectedKeys: Set<string>;       // tile coords "x,y" of consumed key tiles
   sentries: SentryState[];
   bossPressed: Set<string>;         // persistent boss plates across all loops
+  totalBossPlates: number;          // total number of B plates originally in the level
 }
 
 // Player AABB (slightly smaller than a tile so wall play feels forgiving)
@@ -114,6 +115,14 @@ function makePlatformState(def: MovingPlatformDef): PlatformState {
 
 export function initEngine(level: LevelDef): EngineState {
   const { tiles, width, height, spawnX, spawnY, lasers } = parseLevel(level);
+  // Count all initial `B` boss plates in the level so we know when the H
+  // boss-door should unlock.
+  let totalBossPlates = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (tiles[y][x] === "B") totalBossPlates++;
+    }
+  }
   return {
     level,
     tick: 0,
@@ -131,6 +140,7 @@ export function initEngine(level: LevelDef): EngineState {
     collectedKeys: new Set(),
     sentries: (level.sentries ?? []).map(makeSentryState),
     bossPressed: new Set(),
+    totalBossPlates,
   };
 }
 
@@ -211,13 +221,11 @@ function isTileSolid(state: EngineState, tx: number, ty: number): boolean {
   //             `r` = solid on ODD  loops (1, 3, ...), passable on even.
   if (t === "R") return state.loop % 2 === 0;
   if (t === "r") return state.loop % 2 === 1;
-  // Boss trigger: unlocks a linked door when ALL boss plates in the level
-  // are pressed at least once (persistent). While unpressed, the tile is solid.
-  if (t === "B") {
-    const id = `${tx},${ty}`;
-    return !state.bossPressed.has(id);
-  }
-  // ~, 1, 2, k are non-solid interactable tiles
+  // Boss-locked door: solid until ALL B plates in the level have been
+  // pressed at least once (persistent across loops). Once every plate is
+  // pressed, the door stays open for the rest of the run.
+  if (t === "H") return state.bossPressed.size < state.totalBossPlates;
+  // ~, 1, 2, k, B are non-solid interactable tiles
   return false;
 }
 

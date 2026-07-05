@@ -11,14 +11,22 @@ A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 s
 * **Phase 5.1** (Audio pack + Character animations) — shipped.
 * **Phase 5.2** (World 8 mechanics + first 5 W8 levels) — shipped.
 * **Phase 5.3** (Bulk content push — Worlds 1-4 filled to targets) — shipped.
-
 * **Phase 5.4** (Content push #2 — Worlds 5-7 filled to targets) — shipped.
+* **Phase 5.5** (World 8 finish + Boss framework) — shipped. **100/100 levels PASS.**
+* **Phase 5.6** (Touch control polish — haptics, dead-zones, one-thumb mode) — shipped.
+* **Phase 5.7** (VFX/SFX polish — Skia particles, screen shake, layered SFX) — shipped.
+* **Phase 5.8** (Skins + Achievements) — shipped: 6 skin variants + 10 achievements.
 
-## Content shipped
-**89 handcrafted levels** across **8 worlds** (was 57 → +32 this session):
-- W1: 10 · W2: 12 · W3: 12 · W4: 12
-- W5 (Portals): 12 · W6 (Keys): 12 · W7 (Time Collapse): 14 · W8 (Final Escape): 5
-- All 89 pass automated headless playtest with S grades.
+## Phase 5.5–5.8 additions
+* New engine mechanics: `H` boss-locked door — solid until every `B` plate in the level is pressed (persistent across loops).
+* World 8 completed: levels 8-6 → 8-16 including mid-boss **The Warden's Gate** (8-8) and final boss **CHRONOS** (8-16).
+* Haptics system (`src/game/haptics.ts`) with per-cue profiles (light/medium/heavy impact, selection, success).
+* Particle system (`src/game/particles.ts`) — Skia-rendered glow particles for jump dust, portal warp, key pickup, laser death, rewind burst, victory confetti.
+* Screen shake on death + rewind (respect toggleable Screen shake setting).
+* One-thumb control mode + enlarged hit-slop on all buttons.
+* Six robot skin palettes (Prototype, Warden Gold, Verdant Echo, Chrono Wraith, Ember Runner, Chronos Prime) with progression-based unlocks.
+* Ten achievements auto-awarded via `recordLevelResult` — First Steps, Learning Time, Gravity Master, Escape Artist, Sharp Reflexes, Time Bender, Chronomancer, Chronos Slain, Perfect Loop, Full Circuit.
+* New UI screens: `/skins`, `/achievements`; menu updated with entries.
 
 ## Phase 5.2 additions
 * New engine mechanics:

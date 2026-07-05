@@ -59,6 +59,20 @@ export default function MainMenu() {
               <Text style={styles.secondaryLabel}>LEVEL SELECT</Text>
             </Pressable>
             <Pressable
+              testID="btn-skins"
+              onPress={() => router.push("/skins" as any)}
+              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
+            >
+              <Text style={styles.secondaryLabel}>SKINS</Text>
+            </Pressable>
+            <Pressable
+              testID="btn-achievements"
+              onPress={() => router.push("/achievements" as any)}
+              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
+            >
+              <Text style={styles.secondaryLabel}>ACHIEVEMENTS</Text>
+            </Pressable>
+            <Pressable
               testID="btn-settings"
               onPress={() => router.push("/settings" as any)}
               style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}

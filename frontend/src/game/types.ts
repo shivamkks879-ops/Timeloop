@@ -6,7 +6,8 @@ export type TileChar =
   | "~" | "1" | "2"
   | "k" | "L"                       // key · locked door
   | "R" | "r"                       // Time Rift phase 0 · phase 1
-  | "B";                            // Boss trigger plate (persistent across loops)
+  | "B"                             // Boss trigger plate (persistent across loops)
+  | "H";                            // Boss-locked door: opens when ALL B plates in the level have been pressed
 
 export interface Laser {
   tx: number;
@@ -113,4 +114,9 @@ export interface SaveData {
   removeAds: boolean;
   audioOn: boolean;
   hapticsOn: boolean;
+  oneThumb: boolean;
+  screenShake: boolean;
+  selectedSkin: string;             // id of the selected robot skin
+  unlockedSkins: string[];          // ids of unlocked skin variants
+  achievements: string[];           // ids of unlocked achievements
 }

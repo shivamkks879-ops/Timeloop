@@ -20,8 +20,10 @@ import {
 } from "@/src/game/engine";
 import { HUD } from "@/src/game/hud";
 import { getLevel, nextLevelId } from "@/src/game/levels";
-import { recordLevelResult } from "@/src/game/save";
+import { getCachedSave, recordLevelResult } from "@/src/game/save";
 import { playCue } from "@/src/game/audio";
+import { haptic } from "@/src/game/haptics";
+import { spawnBurst } from "@/src/game/particles";
 
 // Lazy-load the Skia renderer so its top-level Skia code doesn't run until
 // CanvasKit is ready (see _layout.tsx LoadSkiaWeb).
@@ -46,6 +48,8 @@ export default function GameScreen() {
   const pausedRef = useRef(false);
   const rafRef = useRef<number | null>(null);
   const accRef = useRef(0);
+  // Screen shake driver: number of ticks of shake remaining + peak intensity.
+  const shakeRef = useRef<{ ticks: number; peak: number }>({ ticks: 0, peak: 0 });
   const lastRef = useRef(0);
 
   // Snapshot of last-tick fields used to detect discrete audio events
@@ -103,22 +107,72 @@ export default function GameScreen() {
           // Jump: was on ground last tick, now airborne moving against gravity.
           if (p.onGround && !cur.player.onGround && cur.player.vy * gDir < 0) {
             playCue("jump");
+            haptic("jump");
+            // Small dust puff at the player's feet on jump.
+            const feetY = cur.player.gravityDir === 1
+              ? cur.player.y + 28
+              : cur.player.y;
+            spawnBurst({
+              x: cur.player.x + 11,
+              y: feetY,
+              color: "rgba(0, 229, 255, 0.9)",
+              count: 6,
+              speed: 2.4,
+              life: 320,
+              radius: 2,
+              gravity: cur.player.gravityDir === 1 ? 0.15 : -0.15,
+            });
           }
           // Land: was airborne, now on ground.
           if (!p.onGround && cur.player.onGround) {
             playCue("land");
+            haptic("land");
           }
           // Portal: teleCd goes from 0 → positive means we just teleported.
           if (p.teleCd === 0 && cur.player.teleCd > 0) {
             playCue("portal");
+            haptic("portal");
+            spawnBurst({
+              x: cur.player.x + 11,
+              y: cur.player.y + 14,
+              color: "rgba(157, 0, 255, 0.95)",
+              count: 14,
+              speed: 3.4,
+              life: 480,
+              radius: 3,
+              gravity: 0,
+            });
           }
           // Key pickup: collectedKeys count grew.
           if (cur.collectedKeys.size > p.keys) {
             playCue("echo_create");
+            haptic("key");
+            spawnBurst({
+              x: cur.player.x + 11,
+              y: cur.player.y + 14,
+              color: "rgba(0, 255, 136, 0.95)",
+              count: 12,
+              speed: 2.6,
+              life: 520,
+              radius: 3,
+              gravity: 0,
+            });
           }
           // Laser mid-loop death (before overall status changes).
           if (p.alive && !cur.player.alive && cur.status === "playing") {
             playCue("laser");
+            haptic("laser");
+            spawnBurst({
+              x: cur.player.x + 11,
+              y: cur.player.y + 14,
+              color: "rgba(255, 0, 60, 0.95)",
+              count: 22,
+              speed: 4.2,
+              life: 620,
+              radius: 3,
+              gravity: 0.3,
+            });
+            shakeRef.current = { ticks: 14, peak: 6 };
           }
           prevRef.current = {
             onGround: cur.player.onGround,
@@ -131,12 +185,28 @@ export default function GameScreen() {
           if (cur.loop > prevLoop) {
             playCue("rewind");
             playCue("echo_create");
+            haptic("rewind");
+            // Rewind burst at spawn position.
+            spawnBurst({
+              x: cur.spawnX + 11,
+              y: cur.spawnY + 14,
+              color: "rgba(157, 0, 255, 0.9)",
+              count: 26,
+              speed: 4.5,
+              life: 780,
+              radius: 3,
+              gravity: 0,
+            });
+            shakeRef.current = { ticks: 20, peak: 8 };
             // Reset event tracker for the fresh loop.
             prevRef.current.onGround = true;
             prevRef.current.alive = true;
             prevRef.current.vy = 0;
             prevRef.current.teleCd = 0;
           }
+
+          // Decay shake counter each tick.
+          if (shakeRef.current.ticks > 0) shakeRef.current.ticks -= 1;
         }
         setFrame((n) => (n + 1) % 1_000_000);
 
@@ -148,10 +218,34 @@ export default function GameScreen() {
           setOutcome({ kind: "won", loops: s.loop, grade, stars });
           recordLevelResult(s.level.id, s.loop, grade, stars).catch(() => {});
           playCue("win");
+          haptic("win");
+          // Confetti-ish victory burst at the player's location.
+          spawnBurst({
+            x: s.player.x + 11,
+            y: s.player.y + 14,
+            color: "rgba(0, 229, 255, 0.95)",
+            count: 30,
+            speed: 5,
+            life: 900,
+            radius: 3,
+            gravity: 0.05,
+          });
+          spawnBurst({
+            x: s.player.x + 11,
+            y: s.player.y + 14,
+            color: "rgba(0, 255, 136, 0.95)",
+            count: 18,
+            speed: 3.6,
+            life: 780,
+            radius: 3,
+            gravity: 0.05,
+          });
         }
         if (s && s.status === "dead" && !outcome) {
           setOutcome({ kind: "dead", loops: s.loop });
           playCue("die");
+          haptic("death");
+          shakeRef.current = { ticks: 24, peak: 10 };
         }
       }
       rafRef.current = requestAnimationFrame(loop);
@@ -175,6 +269,20 @@ export default function GameScreen() {
 
   const s = stateRef.current;
   const timeSec = s ? timeRemaining(s) : 10;
+
+  // Screen shake offset — derived per-render from the shakeRef counter.
+  // Uses a cheap deterministic-ish pseudo-random from the frame counter so
+  // the shake pattern is smooth but not obviously periodic.
+  let shakeX = 0;
+  let shakeY = 0;
+  if (shakeRef.current.ticks > 0 && getCachedSave().screenShake) {
+    const t = shakeRef.current.ticks;
+    const peak = shakeRef.current.peak;
+    const mag = (t / 24) * peak;
+    const a = t * 1.3;
+    shakeX = Math.sin(a) * mag;
+    shakeY = Math.cos(a * 1.7) * mag;
+  }
 
   const doRetry = () => {
     if (!stateRef.current) return;
@@ -205,7 +313,7 @@ export default function GameScreen() {
         }
       >
         {size.w > 0 && s ? (
-          <View style={styles.canvasWrap}>
+          <View style={[styles.canvasWrap, { transform: [{ translateX: shakeX }, { translateY: shakeY }] }]}>
             <Suspense fallback={<View style={styles.canvasWrap} />}>
               <GameRenderer state={s} width={size.w} height={size.h} timeLow={timeSec <= 3} />
             </Suspense>
@@ -224,6 +332,7 @@ export default function GameScreen() {
         <TouchControls
           onChange={(c) => (controlsRef.current = c)}
           paused={paused || outcome !== null}
+          oneThumb={getCachedSave().oneThumb}
         />
 
         <HintOverlay text={level.hint} />

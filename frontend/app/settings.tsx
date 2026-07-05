@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { setAudioEnabled } from "@/src/game/audio";
+import { setHapticsEnabled } from "@/src/game/haptics";
 import { COLORS } from "@/src/game/constants";
 import {
   getCachedSave,
@@ -13,6 +14,8 @@ import {
   persistSave,
   setAudio,
   setHaptics,
+  setOneThumb,
+  setScreenShake,
 } from "@/src/game/save";
 
 export default function Settings() {
@@ -31,7 +34,17 @@ export default function Settings() {
     setTick((n) => n + 1);
   };
   const toggleHaptics = async () => {
-    await setHaptics(!save.hapticsOn);
+    const next = !save.hapticsOn;
+    await setHaptics(next);
+    setHapticsEnabled(next);
+    setTick((n) => n + 1);
+  };
+  const toggleOneThumb = async () => {
+    await setOneThumb(!save.oneThumb);
+    setTick((n) => n + 1);
+  };
+  const toggleShake = async () => {
+    await setScreenShake(!save.screenShake);
     setTick((n) => n + 1);
   };
 
@@ -78,6 +91,24 @@ export default function Settings() {
               trackColor={{ true: "rgba(0, 229, 255, 0.5)", false: "#2A2E3F" }}
             />
           </Row>
+          <Row label="One-thumb mode" testID="row-onethumb">
+            <Switch
+              testID="switch-onethumb"
+              value={save.oneThumb}
+              onValueChange={toggleOneThumb}
+              thumbColor={save.oneThumb ? COLORS.cyan : COLORS.textMuted}
+              trackColor={{ true: "rgba(0, 229, 255, 0.5)", false: "#2A2E3F" }}
+            />
+          </Row>
+          <Row label="Screen shake" testID="row-shake">
+            <Switch
+              testID="switch-shake"
+              value={save.screenShake}
+              onValueChange={toggleShake}
+              thumbColor={save.screenShake ? COLORS.cyan : COLORS.textMuted}
+              trackColor={{ true: "rgba(0, 229, 255, 0.5)", false: "#2A2E3F" }}
+            />
+          </Row>
           <Row label="Progress" testID="row-reset">
             <Pressable
               testID="btn-reset"
@@ -90,7 +121,7 @@ export default function Settings() {
         </View>
 
         <Text style={styles.footer}>
-          v1.0.0 · Phase 1 · World 1 · Built with Expo + Skia
+          v1.0.0 · 100 LEVELS · Built with Expo + Skia
         </Text>
       </SafeAreaView>
     </View>

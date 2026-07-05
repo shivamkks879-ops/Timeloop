@@ -19,6 +19,7 @@ import { COLORS, SIM } from "./constants";
 import type { EngineState, Actor } from "./engine";
 import { PLAYER_W, PLAYER_H } from "./engine";
 import { RobotSprite, derivePose, type Pose } from "./character";
+import { getLiveParticles } from "./particles";
 
 interface Props {
   state: EngineState;
@@ -215,11 +216,23 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
               <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={4} color={COLORS.white} opacity={0.9} />
             </Group>
           );
+        } else if (t === "H") {
+          // Boss-locked door: solid until ALL B plates in the level are pressed.
+          const unlocked = state.bossPressed.size >= state.totalBossPlates;
+          nodes.push(
+            <Group key={`hd${x},${y}`} opacity={unlocked ? 0.2 : 1}>
+              <Rect x={px + 4} y={py} width={SIM.TILE - 8} height={SIM.TILE} color="#FF7A00">
+                <Blur blur={unlocked ? 8 : 3} />
+              </Rect>
+              <Rect x={px + 8} y={py + 2} width={SIM.TILE - 16} height={SIM.TILE - 4} color="#FFD54D" opacity={0.4} />
+              <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={4} color={COLORS.white} opacity={0.9} />
+            </Group>
+          );
         }
       }
     }
     return nodes;
-  }, [state.tiles, state.height, state.width, state.platesPressed, state.keyCollected, state.loop, state.bossPressed]);
+  }, [state.tiles, state.height, state.width, state.platesPressed, state.keyCollected, state.loop, state.bossPressed, state.totalBossPlates]);
 
   const platformNodes = state.platforms.map((p) => (
     <Group key={p.def.id}>
@@ -299,6 +312,29 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
     animFrame,
   );
 
+  // Particles are pure eye-candy: read from the module-level pool and render
+  // as fading circles. Runs each frame — always uses fresh Date.now().
+  const now = Date.now();
+  const particles = getLiveParticles(now);
+  const particleNodes = particles.map((p) => {
+    const age = (now - p.bornAt) / p.life;   // 0..1
+    if (age >= 1) return null;
+    // Integrate against age using life ms so particle velocity is roughly
+    // consistent across framerates.
+    const t = (now - p.bornAt) / (1000 / 60);
+    const px = p.x + p.vx * t;
+    const py = p.y + p.vy * t + 0.5 * p.gravity * t * t;
+    const alpha = 1 - age;
+    return (
+      <Group key={`pt${p.id}`}>
+        <Circle cx={px} cy={py} r={p.radius + 3} color={p.color} opacity={alpha * 0.35}>
+          <Blur blur={5} />
+        </Circle>
+        <Circle cx={px} cy={py} r={p.radius} color={p.color} opacity={alpha} />
+      </Group>
+    );
+  });
+
   return (
     <Canvas style={{ width, height }}>
       <Rect x={0} y={0} width={width} height={height}>
@@ -317,6 +353,7 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         {beamNodes}
         {echoes}
         <RobotSprite actor={state.player} frame={animFrame} pose={playerPose} />
+        {particleNodes}
       </Group>
     </Canvas>
   );

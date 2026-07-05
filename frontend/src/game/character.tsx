@@ -30,6 +30,7 @@ import {
 
 import { COLORS } from "./constants";
 import { PLAYER_H, PLAYER_W } from "./engine";
+import { getCurrentSkin } from "./skins";
 import type { PlayerState } from "./types";
 
 export type Pose =
@@ -92,9 +93,10 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
   const flip = actor.gravityDir === -1;
   const face = actor.facing >= 0 ? 1 : -1;
 
-  const bodyMain = echo ? ECHO_BODY : pose === "dead" ? RED : BODY_LIGHT;
-  const bodyShade = echo ? ECHO_DARK : pose === "dead" ? "#8A0020" : BODY_DARK;
-  const visor = echo ? "#E0A0FF" : COLORS.cyan;
+  const skin = echo ? null : getCurrentSkin();
+  const bodyMain = echo ? ECHO_BODY : pose === "dead" ? RED : (skin?.bodyMain ?? BODY_LIGHT);
+  const bodyShade = echo ? ECHO_DARK : pose === "dead" ? "#8A0020" : (skin?.bodyShade ?? BODY_DARK);
+  const visor = echo ? "#E0A0FF" : (skin?.visor ?? COLORS.cyan);
   const opacity = echo ? (echoAlive === false ? 0.28 : 0.55) : pose === "dead" ? 0.55 : 1;
 
   // ---- Pose-driven joints ----

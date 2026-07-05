@@ -501,6 +501,67 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
     { ticks: 600, right: true },     // loop 0: pick up key at col 5, blocked at R
     { ticks: 300, right: true },     // loop 1: R open, key already held, unlock L, reach G
   ],
+
+  // ─── Late World 8 (Phase 5.5) — road to final boss ─────────────────
+  // 8-6: r rift is passable on loop 0 (even). Just walk right to goal.
+  "8-6": [{ ticks: 280, right: true }],
+
+  // 8-7: Three R rifts (all solid on loop 0). Loop 1 opens all — sprint.
+  "8-7": [
+    { ticks: 600, right: true },
+    { ticks: 300, right: true },
+  ],
+
+  // 8-8: Mid-boss. Two B plates at cols 2 and 20. R rift at col 11 splits them.
+  //      Loop 0: walk right, press B1, blocked at R. Echo saves position.
+  //      Loop 1: R open, echo replays through, live player crosses, presses B2,
+  //              H unlocks (2/2 pressed), reaches G.
+  "8-8": [
+    { ticks: 600, right: true },
+    { ticks: 300, right: true },
+  ],
+
+  // 8-9: Portal skips over sentry patrol. maxEchoes=0. Solved in loop 0.
+  "8-9": [{ ticks: 280, right: true }],
+
+  // 8-10: Rift Sanctuary. Loop 0 blocked, loop 1 open + key + unlock.
+  "8-10": [
+    { ticks: 600, right: true },
+    { ticks: 300, right: true },
+  ],
+
+  // 8-11: Twin boss plates, no rift, no sentry — just walk right, press both,
+  //       H opens, reach goal in one loop.
+  "8-11": [{ ticks: 280, right: true }],
+
+  // 8-12: Rift Cascade — 3 r rifts, all passable on even loops. Trivial walk.
+  "8-12": [{ ticks: 280, right: true }],
+
+  // 8-13: Rift blocks the path, portal skips past it on loop 1.
+  "8-13": [
+    { ticks: 600, right: true },
+    { ticks: 300, right: true },
+  ],
+
+  // 8-14: 1 boss plate + rift. Press B on loop 0, cross rift on loop 1.
+  "8-14": [
+    { ticks: 600, right: true },
+    { ticks: 300, right: true },
+  ],
+
+  // 8-15: Final approach — key on loop 0 (blocked by R), unlock L loop 1.
+  "8-15": [
+    { ticks: 600, right: true },
+    { ticks: 300, right: true },
+  ],
+
+  // 8-16: Final boss Chronos. Three B plates split by R rift.
+  //       Loop 0: press B1 (col 2) and B2 (col 8), blocked at R (col 13).
+  //       Loop 1: R open — cross, press B3 (col 18), H unlocks (3/3), reach G.
+  "8-16": [
+    { ticks: 600, right: true },
+    { ticks: 400, right: true },
+  ],
 };
 
 export interface PlaytestResult {
