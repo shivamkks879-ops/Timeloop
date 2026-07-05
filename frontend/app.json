@@ -1,21 +1,22 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Time Loop Escape",
+    "slug": "time-loop-escape",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
-    "userInterfaceStyle": "automatic",
+    "scheme": "timeloopescape",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.timeloopescape.cab57c"
+      "bundleIdentifier": "com.emergent.timeloopescape.cab57c",
+      "requireFullScreen": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#0A0B10"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.timeloopescape.cab57c"
@@ -27,13 +28,18 @@
     },
     "plugins": [
       "expo-router",
+      "expo-audio",
+      [
+        "expo-screen-orientation",
+        { "initialOrientation": "LANDSCAPE" }
+      ],
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#0A0B10"
         }
       ]
     ],
