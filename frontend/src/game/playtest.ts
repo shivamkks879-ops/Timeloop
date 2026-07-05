@@ -343,6 +343,31 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
   // 5-2: Warp past a vertical laser to the twin, continue to goal.
   "5-2": [{ ticks: 200, right: true }],
 
+  "5-3": [{ ticks: 320, right: true }],
+  "5-4": [{ ticks: 260, right: true }],
+  "5-5": [{ ticks: 320, right: true }],
+  "5-6": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 320, right: true },
+  ],
+  "5-7": [{ ticks: 320, right: true }],
+  "5-8": [{ ticks: 320, right: true }],
+  "5-9": [{ ticks: 260, right: true }],
+  "5-10": [
+    { ticks: 120, right: true },
+    { ticks: 480 },
+    { ticks: 320, right: true },
+  ],
+  "5-11": [{ ticks: 320, right: true }],
+  "5-12": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 120, right: true },
+    { ticks: 480 },
+    { ticks: 320, right: true },
+  ],
+
   // 6-1: Walk right, pick up key at col 9, unlock door at col 14, walk to goal.
   "6-1": [{ ticks: 220, right: true }],
 
@@ -353,9 +378,28 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
     { ticks: 250, right: true },
   ],
 
-  // 7-1: Loop 1 sit on plate (col 5 in row 8, near x=180).
-  //      Loop 2 grab key (col 13) and stop just past it.
-  //      Loop 3 cruise through both doors to the goal.
+  "6-3": [{ ticks: 320, right: true }],
+  "6-4": [
+    { ticks: 20, right: true },
+    { ticks: 580 },
+    { ticks: 600, right: true },
+  ],
+  "6-5": [{ ticks: 1800, right: true }],
+  "6-6": [{ ticks: 260, right: true }],
+  "6-7": [{ ticks: 800, right: true }],
+  "6-8": [{ ticks: 320, right: true }],
+  "6-9": [{ ticks: 320, right: true }],
+  "6-10": [{ ticks: 380, right: true }],
+  "6-11": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 120, right: true },
+    { ticks: 480 },
+    { ticks: 320, right: true },
+  ],
+  "6-12": [{ ticks: 320, right: true }],
+
+  // 7-1: Loop 1 sit on plate. Loop 2 grab key. Loop 3 cruise to goal.
   "7-1": [
     { ticks: 50, right: true },
     { ticks: 550 },
@@ -364,13 +408,69 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
     { ticks: 260, right: true },
   ],
 
-  // 7-2: Loop 1 walk into beam to place shield. Loop 2 grab key. Loop 3 escape.
+  // 7-2: Loop 1 shield beam. Loop 2 grab key. Loop 3 escape.
   "7-2": [
     { ticks: 120, right: true },
     { ticks: 40 },
     { ticks: 130, right: true },
     { ticks: 30 },
     { ticks: 260, right: true },
+  ],
+
+  "7-3": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 120, right: true },
+    { ticks: 480 },
+    { ticks: 320, right: true },
+  ],
+  "7-4": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 320, right: true },
+  ],
+  "7-5": [{ ticks: 2400, right: true }],
+  "7-6": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 60, right: true },
+    { ticks: 540 },
+    { ticks: 320, right: true },
+  ],
+  "7-7": [{ ticks: 320, right: true }],
+  "7-8": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 320, right: true },
+  ],
+  "7-9": [{ ticks: 320, right: true }],
+  "7-10": [
+    { ticks: 600, right: true },
+    { ticks: 300, right: true },
+  ],
+  "7-11": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 120, right: true },
+    { ticks: 480 },
+    { ticks: 320, right: true },
+  ],
+  "7-12": [{ ticks: 3000, right: true }],
+  "7-13": [
+    { ticks: 120, right: true },
+    { ticks: 480 },
+    { ticks: 60, right: true },
+    { ticks: 540 },
+    { ticks: 320, right: true },
+  ],
+  "7-14": [
+    { ticks: 30, right: true },
+    { ticks: 570 },
+    { ticks: 60, right: true },
+    { ticks: 540 },
+    { ticks: 120, right: true },
+    { ticks: 480 },
+    { ticks: 320, right: true },
   ],
 
   // ─────────────────────── WORLD 8 · Final Escape ───────────────────────────
