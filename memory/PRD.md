@@ -10,6 +10,13 @@ A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 s
 * **Phase 4** (Worlds 6 & 7) — shipped.
 * **Phase 5.1** (Audio pack + Character animations) — shipped.
 * **Phase 5.2** (World 8 mechanics + first 5 W8 levels) — shipped.
+* **Phase 5.3** (Bulk content push — Worlds 1-4 filled to targets) — shipped.
+
+## Content shipped
+**57 handcrafted levels** across **8 worlds** (was 24 → +33 this session):
+- W1 (Learning Time): 10 · W2 (Lasers): 12 · W3 (Moving Platforms): 12 · W4 (Gravity Flip): 12
+- W5 (Portals): 2 · W6 (Keys): 2 · W7 (Time Collapse): 2 · W8 (Final Escape): 5
+- All 57 pass automated headless playtest with S grades.
 
 ## Phase 5.2 additions
 * New engine mechanics:

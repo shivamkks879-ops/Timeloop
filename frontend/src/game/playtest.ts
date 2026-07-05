@@ -60,6 +60,51 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
     { ticks: 600, right: true },
   ],
 
+  // 1-6: Twin pits at cols 4-5 and 10-11. Jump timing tuned to physics.
+  "1-6": [
+    { ticks: 25, right: true },
+    { ticks: 12, right: true, jump: true },
+    { ticks: 30, right: true },
+    { ticks: 12, right: true, jump: true },
+    { ticks: 250, right: true },
+  ],
+
+  // 1-7: Stepped ledges. Jump up each step.
+  "1-7": [
+    { ticks: 40, right: true },
+    { ticks: 6, right: true, jump: true },
+    { ticks: 30, right: true },
+    { ticks: 6, right: true, jump: true },
+    { ticks: 30, right: true },
+    { ticks: 6, right: true, jump: true },
+    { ticks: 200, right: true },
+  ],
+
+  // 1-8: Plate at col 3 (P), door at col 14, goal col 22. 1-echo.
+  "1-8": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 260, right: true },
+  ],
+
+  // 1-9: Two plates at cols 2 and 9. Both need holding to open door at col 14.
+  "1-9": [
+    { ticks: 15, right: true },     // loop 0: park on first plate (col 2)
+    { ticks: 585 },
+    { ticks: 55, right: true },     // loop 1: park on second plate (col 9)
+    { ticks: 545 },
+    { ticks: 260, right: true },    // loop 2: cruise through door to goal
+  ],
+
+  // 1-10: Plate at col 2, spike pit at cols 8-9, door col 14, goal col 22.
+  "1-10": [
+    { ticks: 15, right: true },      // loop 0: park on plate
+    { ticks: 585 },
+    { ticks: 55, right: true },      // loop 1: run
+    { ticks: 6, right: true, jump: true },   // jump spike pit
+    { ticks: 200, right: true },
+  ],
+
   // 2-1: Vertical laser at col 10 row 3. Loop 1 die at beam. Loop 2 echo blocks, player crosses.
   // Beam center x = 336. Player width 22 hits beam at x ~314 (right edge in beam column).
   "2-1": [
@@ -87,6 +132,149 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
     { ticks: 110, right: true },
     { ticks: 40 },
     { ticks: 300, right: true },
+  ],
+
+  // 2-4: Three vertical beams at cols 4, 10, 16. Three sacrifices then cross.
+  "2-4": [
+    { ticks: 50, right: true },      // die at col 4 beam
+    { ticks: 30 },
+    { ticks: 105, right: true },     // die at col 10
+    { ticks: 30 },
+    { ticks: 155, right: true },     // die at col 16
+    { ticks: 40 },
+    { ticks: 250, right: true },     // cruise past shielded beams
+  ],
+
+  // 2-5: Single vertical beam at col 14. Same rhythm as 2-1 but further right.
+  "2-5": [
+    { ticks: 150, right: true },
+    { ticks: 30 },
+    { ticks: 250, right: true },
+  ],
+
+  // 2-6: Horizontal beam `>` at col 10 row 6. Player runs; corpse at col 10 blocks beam.
+  "2-6": [
+    { ticks: 120, right: true },     // walk toward beam, die when overlapping
+    { ticks: 30 },
+    { ticks: 240, right: true },
+  ],
+
+  // 2-7: Crossfire (down + right). Two echoes shield each.
+  "2-7": [
+    { ticks: 120, right: true },
+    { ticks: 30 },
+    { ticks: 120, right: true },
+    { ticks: 30 },
+    { ticks: 240, right: true },
+  ],
+
+  // 2-8: Plate col 3, beam col 8 row 3 (vertical), door col 14, goal 22.
+  //      Loop 1: park plate. Loop 2: fetch death at beam. Loop 3: cross safely.
+  "2-8": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 100, right: true },
+    { ticks: 40 },
+    { ticks: 260, right: true },
+  ],
+
+  // 2-9: Two vertical beams at col 5 and col 14.
+  "2-9": [
+    { ticks: 70, right: true },
+    { ticks: 30 },
+    { ticks: 145, right: true },
+    { ticks: 30 },
+    { ticks: 260, right: true },
+  ],
+
+  // 2-10: Three beams at cols 6, 10, 18. Sacrifice each.
+  "2-10": [
+    { ticks: 80, right: true },
+    { ticks: 30 },
+    { ticks: 110, right: true },
+    { ticks: 30 },
+    { ticks: 180, right: true },
+    { ticks: 30 },
+    { ticks: 280, right: true },
+  ],
+
+  // 2-11: Plate col 3, beam col 10 row 3, door col 17, goal 22. Needs 3 loops.
+  "2-11": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 120, right: true },
+    { ticks: 40 },
+    { ticks: 300, right: true },
+  ],
+
+  // 2-12: Four beams at cols 4/9/14/19. Sacrifice 3 echoes, walk the last.
+  "2-12": [
+    { ticks: 600, right: true },
+    { ticks: 600, right: true },
+    { ticks: 600, right: true },
+    { ticks: 600, right: true },
+  ],
+
+  // ────────────────────────── WORLD 3 · Moving Platforms ──────────────────────
+  "3-4": [
+    { ticks: 60, right: true },
+    { ticks: 240 },
+    { ticks: 150, right: true },
+  ],
+  "3-5": [
+    { ticks: 60, right: true },
+    { ticks: 180 },
+    { ticks: 80, right: true },
+    { ticks: 180 },
+    { ticks: 120, right: true },
+  ],
+  "3-6": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 80, right: true },
+    { ticks: 150 },
+    { ticks: 200, right: true },
+  ],
+  "3-7": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 80, right: true },
+    { ticks: 180 },
+    { ticks: 200, right: true },
+  ],
+  "3-8": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 130, right: true },
+    { ticks: 250 },
+    { ticks: 100, right: true },
+  ],
+  // 3-9: Same rhythm as 3-1 — walk, wait for platform to swing, cross.
+  "3-9": [
+    { ticks: 55, right: true },
+    { ticks: 235 },
+    { ticks: 100, right: true },
+  ],
+  "3-10": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 80, right: true },
+    { ticks: 180 },
+    { ticks: 200, right: true },
+  ],
+  "3-11": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 80, right: true },
+    { ticks: 200 },
+    { ticks: 200, right: true },
+  ],
+  "3-12": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 80, right: true },      // ride to right
+    { ticks: 200 },
+    { ticks: 200, right: true },
   ],
 
   // 3-1: Always-oscillating platform. Board at col 5-6, ride to col 14, walk off.
@@ -120,6 +308,34 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
 
   // 4-2: Flip, cross ceiling, second flip drops onto safe floor past spike pit.
   "4-2": [{ ticks: 320, right: true }],
+  "4-3": [{ ticks: 320, right: true }],
+  "4-4": [{ ticks: 320, right: true }],
+  "4-5": [{ ticks: 320, right: true }],
+  "4-6": [{ ticks: 320, right: true }],
+  "4-7": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 320, right: true },
+  ],
+  "4-8": [
+    { ticks: 150, right: true },    // sacrifice at ceiling laser
+    { ticks: 30 },
+    { ticks: 320, right: true },
+  ],
+  "4-9": [{ ticks: 380, right: true }],
+  "4-10": [{ ticks: 380, right: true }],
+  "4-11": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 320, right: true },
+  ],
+  "4-12": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 140, right: true },    // sacrifice at ceiling beam
+    { ticks: 40 },
+    { ticks: 320, right: true },
+  ],
 
   // 5-1: Walk into portal, warp to twin, continue to goal.
   "5-1": [{ ticks: 200, right: true }],
