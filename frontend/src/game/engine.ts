@@ -42,6 +42,8 @@ export interface EngineState {
   platesPressed: Set<string>;
   platforms: PlatformState[];
   beams: LaserBeam[];
+  keyCollected: boolean;
+  collectedKeys: Set<string>;       // tile coords "x,y" of consumed key tiles
 }
 
 // Player AABB (slightly smaller than a tile so wall play feels forgiving)
@@ -117,6 +119,8 @@ export function initEngine(level: LevelDef): EngineState {
     platesPressed: new Set(),
     platforms: (level.platforms ?? []).map(makePlatformState),
     beams: [],
+    keyCollected: false,
+    collectedKeys: new Set(),
   };
 }
 
@@ -174,7 +178,8 @@ function isTileSolid(state: EngineState, tx: number, ty: number): boolean {
   if (t === "#" || t === "P") return true;
   if (t === "<" || t === ">" || t === "n" || t === "v") return true;
   if (t === "D") return state.platesPressed.size === 0;
-  // ~, 1, 2 are non-solid interactable tiles
+  if (t === "L") return !state.keyCollected;
+  // ~, 1, 2, k are non-solid interactable tiles
   return false;
 }
 
@@ -509,7 +514,7 @@ function interactTiles(state: EngineState, a: Actor) {
   if (t === "~" && a.flipCd === 0) {
     a.gravityDir = (a.gravityDir === 1 ? -1 : 1) as 1 | -1;
     a.flipCd = 20;
-    a.vy = 0;                // avoid launching in the wrong direction
+    a.vy = 0;
     a.onGround = false;
   } else if ((t === "1" || t === "2") && a.teleCd === 0) {
     const other = findPortalPair(state, t === "1" ? "2" : "1");
@@ -518,6 +523,15 @@ function interactTiles(state: EngineState, a: Actor) {
       a.y = other.ty * SIM.TILE + (SIM.TILE - PLAYER_H) / 2;
       a.vx = 0; a.vy = 0;
       a.teleCd = 20;
+    }
+  } else if (t === "k") {
+    // Consume the key tile: mark the key collected and remove from grid.
+    const id = `${tx},${ty}`;
+    if (!state.collectedKeys.has(id)) {
+      state.collectedKeys.add(id);
+      state.keyCollected = true;
+      // Blank out the tile so it disappears visually + logically for the loop.
+      state.tiles[ty][tx] = ".";
     }
   }
 }

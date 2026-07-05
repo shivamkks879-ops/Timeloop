@@ -147,11 +147,35 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
               </Circle>
             </Group>
           );
+        } else if (t === "k") {
+          // Golden key
+          const cxk = px + SIM.TILE / 2;
+          const cyk = py + SIM.TILE / 2;
+          nodes.push(
+            <Group key={`k${x},${y}`}>
+              <Circle cx={cxk} cy={cyk} r={SIM.TILE / 2 - 6} color={COLORS.green} opacity={0.3}>
+                <Blur blur={6} />
+              </Circle>
+              <Circle cx={cxk - 4} cy={cyk - 2} r={5} color={COLORS.green} style="stroke" strokeWidth={2} />
+              <Rect x={cxk - 1} y={cyk - 2} width={9} height={2} color={COLORS.green} />
+              <Rect x={cxk + 5} y={cyk} width={3} height={3} color={COLORS.green} />
+            </Group>
+          );
+        } else if (t === "L") {
+          const unlocked = state.keyCollected;
+          nodes.push(
+            <Group key={`ld${x},${y}`} opacity={unlocked ? 0.2 : 1}>
+              <Rect x={px + 6} y={py} width={SIM.TILE - 12} height={SIM.TILE} color={COLORS.green}>
+                <Blur blur={unlocked ? 6 : 2} />
+              </Rect>
+              <Rect x={px + 10} y={py + 2} width={SIM.TILE - 20} height={SIM.TILE - 4} color={COLORS.white} opacity={0.35} />
+            </Group>
+          );
         }
       }
     }
     return nodes;
-  }, [state.tiles, state.height, state.width, state.platesPressed]);
+  }, [state.tiles, state.height, state.width, state.platesPressed, state.keyCollected]);
 
   const platformNodes = state.platforms.map((p) => (
     <Group key={p.def.id}>

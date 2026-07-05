@@ -126,6 +126,36 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
 
   // 5-2: Warp past a vertical laser to the twin, continue to goal.
   "5-2": [{ ticks: 200, right: true }],
+
+  // 6-1: Walk right, pick up key at col 9, unlock door at col 14, walk to goal.
+  "6-1": [{ ticks: 220, right: true }],
+
+  // 6-2: Loop 1 park on plate at col 2 (x=64-95). Loop 2 fetch key, unlock, cross.
+  "6-2": [
+    { ticks: 20, right: true },
+    { ticks: 580 },
+    { ticks: 250, right: true },
+  ],
+
+  // 7-1: Loop 1 sit on plate (col 5 in row 8, near x=180).
+  //      Loop 2 grab key (col 13) and stop just past it.
+  //      Loop 3 cruise through both doors to the goal.
+  "7-1": [
+    { ticks: 50, right: true },
+    { ticks: 550 },
+    { ticks: 130, right: true },
+    { ticks: 470 },
+    { ticks: 260, right: true },
+  ],
+
+  // 7-2: Loop 1 walk into beam to place shield. Loop 2 grab key. Loop 3 escape.
+  "7-2": [
+    { ticks: 120, right: true },
+    { ticks: 40 },
+    { ticks: 130, right: true },
+    { ticks: 30 },
+    { ticks: 260, right: true },
+  ],
 };
 
 export interface PlaytestResult {

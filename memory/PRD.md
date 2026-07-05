@@ -7,6 +7,7 @@ A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 s
 * **Phase 1** (Core Mechanics + First Playable) — shipped.
 * **Phase 2** (Worlds 2 & 3) — shipped.
 * **Phase 3** (Worlds 4 & 5) — shipped.
+* **Phase 4** (Worlds 6 & 7) — shipped.
 
 ## Content shipped
 
@@ -76,6 +77,20 @@ app/
 
 ## Phase 4+ Roadmap
 * World 6 Security Factory (keys + locked doors + guard patterns).
+* World 7 Time Collapse (many echoes, layered puzzles).
+* World 8 Final Escape (mastery combo of all mechanics).
+* Real audio pack, character animation frames.
+* AdMob SDK + Google Play Billing wiring.
+* Cloud save, achievements, unlockable robot skins.
+* Fill out 100-level content target.
+
+## Known Limitations
+* 15 of 100 target levels shipped; architecture is ready to scale.
+* Character sprite is static (no run/jump animation frames yet).
+* Audio calls wired but silent.
+* AdMob / IAP UI are stubs.
+
+s + locked doors + guard patterns).
 * World 7 Time Collapse (many echoes, layered puzzles).
 * World 8 Final Escape (mastery combo of all mechanics).
 * Real audio pack, character animation frames.

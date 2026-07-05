@@ -3,7 +3,8 @@
 export type TileChar =
   | "." | "#" | "S" | "G" | "^" | "P" | "D"
   | "<" | ">" | "n" | "v"
-  | "~" | "1" | "2";                // gravity flip · portal A · portal B
+  | "~" | "1" | "2"
+  | "k" | "L";                      // key · locked door
 
 export interface Laser {
   tx: number;
