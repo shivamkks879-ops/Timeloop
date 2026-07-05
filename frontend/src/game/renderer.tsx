@@ -122,6 +122,31 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
               </Rect>
             </Group>
           );
+        } else if (t === "~") {
+          // Gravity-flip swirl: soft cyan/purple orb.
+          nodes.push(
+            <Group key={`f${x},${y}`}>
+              <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={SIM.TILE / 2 - 4} color={COLORS.purple} opacity={0.35}>
+                <Blur blur={6} />
+              </Circle>
+              <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={SIM.TILE / 3} color={COLORS.cyan} style="stroke" strokeWidth={2} />
+              <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={4} color={COLORS.white} />
+            </Group>
+          );
+        } else if (t === "1" || t === "2") {
+          // Portals: cyan (1) / purple (2) glowing rings.
+          const ringColor = t === "1" ? COLORS.cyan : COLORS.purple;
+          nodes.push(
+            <Group key={`t${x},${y}`}>
+              <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={SIM.TILE / 2 - 2} color={ringColor} opacity={0.3}>
+                <Blur blur={6} />
+              </Circle>
+              <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={SIM.TILE / 2 - 4} color={ringColor} style="stroke" strokeWidth={2.5} />
+              <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={SIM.TILE / 4} color={ringColor} opacity={0.5}>
+                <Blur blur={3} />
+              </Circle>
+            </Group>
+          );
         }
       }
     }
@@ -164,6 +189,7 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
       color={COLORS.purple}
       opacity={e.alive ? 0.55 : 0.32}
       echo
+      flipped={e.gravityDir === -1}
     />
   ));
 
@@ -184,9 +210,9 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         {beamNodes}
         {echoes}
         {state.player.alive ? (
-          <ActorSprite x={state.player.x} y={state.player.y} facing={state.player.facing} color={COLORS.white} opacity={1} />
+          <ActorSprite x={state.player.x} y={state.player.y} facing={state.player.facing} color={COLORS.white} opacity={1} flipped={state.player.gravityDir === -1} />
         ) : (
-          <ActorSprite x={state.player.x} y={state.player.y} facing={state.player.facing} color={COLORS.red} opacity={0.5} />
+          <ActorSprite x={state.player.x} y={state.player.y} facing={state.player.facing} color={COLORS.red} opacity={0.5} flipped={state.player.gravityDir === -1} />
         )}
       </Group>
     </Canvas>
@@ -194,23 +220,25 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
 }
 
 function ActorSprite({
-  x, y, facing, color, opacity, echo,
+  x, y, facing, color, opacity, echo, flipped,
 }: {
-  x: number; y: number; facing: number; color: string; opacity: number; echo?: boolean;
+  x: number; y: number; facing: number; color: string; opacity: number; echo?: boolean; flipped?: boolean;
 }) {
   const w = PLAYER_W;
   const h = PLAYER_H;
   const visorColor = echo ? COLORS.purple : COLORS.cyan;
+  // When gravity is flipped, put the visor at the "bottom" (which is up in world space)
+  const visorY = flipped ? y + h - 14 : y + 6;
   return (
     <Group opacity={opacity}>
       <RoundedRect x={x - 2} y={y - 2} width={w + 4} height={h + 4} r={10} color={visorColor} opacity={0.25}>
         <Blur blur={6} />
       </RoundedRect>
       <RoundedRect x={x} y={y} width={w} height={h} r={8} color={color} />
-      <RoundedRect x={x + 3 + (facing > 0 ? 2 : 0)} y={y + 6} width={w - 6} height={8} r={3} color={visorColor}>
+      <RoundedRect x={x + 3 + (facing > 0 ? 2 : 0)} y={visorY} width={w - 6} height={8} r={3} color={visorColor}>
         <Blur blur={2} />
       </RoundedRect>
-      <Rect x={x + 3} y={y + h - 3} width={w - 6} height={2} color="#0A0B10" opacity={0.4} />
+      <Rect x={x + 3} y={flipped ? y + 1 : y + h - 3} width={w - 6} height={2} color="#0A0B10" opacity={0.4} />
     </Group>
   );
 }

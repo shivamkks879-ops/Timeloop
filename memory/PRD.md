@@ -1,11 +1,12 @@
 # Time Loop Escape — PRD
 
 ## Product Vision
-A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 seconds. When the timer hits zero — or the player dies — time rewinds and the run becomes a **Time Echo**: a ghost clone that replays the same button inputs through the same physics. Solve each puzzle by planning cooperation between the live player and one or more past selves.
+A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 seconds. When the timer hits zero — or the player dies — time rewinds and the run becomes a **Time Echo**: a ghost clone that replays the same button inputs through the same physics.
 
 ## Ship Status
 * **Phase 1** (Core Mechanics + First Playable) — shipped.
 * **Phase 2** (Worlds 2 & 3) — shipped.
+* **Phase 3** (Worlds 4 & 5) — shipped.
 
 ## Content shipped
 
@@ -14,56 +15,51 @@ A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 s
 
 ### World 2 · Lasers (3 levels)
 2-1 First Beam · 2-2 Twin Beams · 2-3 Gated Beam
-Every alive actor overlapping a beam dies. Corpses (dead echoes) remain in place and continue to block, so the player intentionally sacrifices runs to create permanent shields.
 
 ### World 3 · Moving Platforms (3 levels)
-3-1 Rolling Bridge (always-oscillating) · 3-2 Escort Service (plate-triggered) · 3-3 Full Circle (plate + door)
-Platforms carry any actor whose feet rest on their top surface each tick.
+3-1 Rolling Bridge · 3-2 Escort Service · 3-3 Full Circle
 
-Total: **11 handcrafted levels**, all validated by the automated playtest harness.
+### World 4 · Gravity Flip (2 levels)
+4-1 Upside Down · 4-2 Return Trip
+The `~` swirl toggles the actor's gravity direction on contact (with 20-tick cooldown). Physics — gravity, jump velocity, jump-cut, wall slide, ground detection, standing-on-platform — all respect the flipped direction. Echoes replay flips deterministically.
+
+### World 5 · Teleport Portals (2 levels)
+5-1 First Warp · 5-2 Portal Bypass
+The `1` and `2` tiles form a portal pair. Overlapping either teleports the actor to the paired tile with a 20-tick cooldown to prevent oscillation. Works for the player and echoes alike.
+
+**Total: 15 handcrafted levels**, all validated by the automated playtest harness (S grade + 3 stars every run).
 
 ## Engine Features
 * Fixed 60 TPS tick-based deterministic engine.
-* Player controller: jump buffer, coyote time, variable jump, wall slide, wall jump (with input lock).
-* AABB tile collision with proper edge-inclusive fix (no more 0.5 px hover on floor).
-* Recorded-input echo system with dead-echo persistence.
-* Lasers: horizontal + vertical beams, blocked by tiles / platforms / any actor (alive OR dead).
-* Moving platforms: waypoint-defined, "always" oscillation or "plate" triggered; actors carried via `standingOn` delta.
-* Death mid-loop → converts run into next echo. Only exhausting `maxEchoes` ends the game.
+* Player controller: jump buffer, coyote time, variable jump, wall slide, wall jump.
+* AABB tile + platform collision with proper edge-inclusive check.
+* Lasers: horizontal + vertical beams; alive actors overlapping the beam die; dead echoes stay in place as permanent blockers.
+* Moving platforms: waypoint-defined; "always" oscillation or "plate"-triggered; actors carried via `standingOn` delta.
+* **Gravity flip**: per-actor `gravityDir` (`1` down / `-1` up); flip tiles + cooldown; ground detection and jump direction respect gravity.
+* **Portal teleport**: paired `1`/`2` tiles with cooldown; deterministic across recordings.
+* Death mid-loop → converts run into next echo. Game-over only on exhausted echo budget.
 * Grading: S / A / B / C based on echoes used vs. `parEchoes` → 3 / 2 / 1 stars.
 
 ## Automated Playtest Harness
-`node scripts/playtest.js` runs a hand-authored solution through the exact engine for every level. Verifies:
-* Reachable goal (level completable)
-* No softlocks (bounded by `maxEchoes`)
-* Echo synchronization (recorded inputs replay identically each loop)
-* Loop timer sanity (`LOOP_TICKS = 600`)
-* Grade + star calculation
-
-Current run: **all 11 levels PASS with S grade + 3 stars.**
+`node scripts/playtest.js` runs the exact engine with hand-authored solutions per level. All 15 levels currently pass with S grade.
 
 ## UI / UX
-* Landscape-locked (`expo-screen-orientation`), safe-area aware.
-* Main menu, level select (with lock + star grades), gameplay HUD (timer, echo counter, pause, restart), pause / retry / next overlays, settings.
-* Touch controls: 68 pt D-pad + 92 pt jump, `onPressIn`/`onPressOut` for zero input delay.
-* Neon sci-fi look: cyan platforms, purple echoes, red lasers/hazards, white robot with glowing visor.
+* Landscape-locked, safe-area aware.
+* Neon sci-fi palette; robot visor flips to the top when gravity flips (visual continuity).
+* Cyan portal (1) + purple portal (2), cyan/white gravity-flip swirl, purple echoes.
+* Main menu, level select (locks + star grades), gameplay HUD, pause / retry / next overlays, settings.
+* Touch controls: 68 pt D-pad + 92 pt jump with zero input delay.
 
-## Monetization (STUBBED)
-`WATCH AD` (rewarded) and `REMOVE ADS` (IAP) live on the menu; they open a modal explaining the release-build behaviour and log/no-op today. `removeAds` state is persisted so post-purchase code paths can be tested.
-
-## Audio (STUBBED / silent)
-`playCue(cue)` is called at all the right moments (jump, land, echo create, rewind, portal, laser, win, die, ui tap) but currently no-ops. Real assets swap in during polish without touching gameplay code.
-
-## Persistence
-`@/src/utils/storage` (AsyncStorage) backed save with per-level completion, best echoes, grade, stars, plus audio / haptics / removeAds preferences.
+## Monetization (STUBBED) & Audio (STUBBED)
+Menu bar shows WATCH AD + REMOVE ADS (modal explanations, log/no-op today). `playCue` hooks fire at all game events but produce no sound. Both are ready for polish-phase swap-in without gameplay code changes.
 
 ## Modular Architecture
 ```
 src/game/
   constants.ts   ← tuning + palette
   types.ts       ← LevelDef, PlayerState, Laser, MovingPlatformDef, EchoRecording, SaveData
-  levels.ts      ← level catalogue (add worlds by appending)
-  engine.ts      ← physics + echoes + lasers + platforms
+  levels.ts      ← level catalogue (5 worlds so far)
+  engine.ts      ← physics + echoes + lasers + platforms + gravity flip + portals
   renderer.tsx   ← Skia layers (tiles → platforms → beams → echoes → player)
   controls.tsx   ← touch input
   hud.tsx        ← in-game overlay
@@ -78,18 +74,18 @@ app/
   game/[id].tsx  ← gameplay screen
 ```
 
-Adding a new mechanic remains a bounded 4-file change (types + engine + renderer + level + solution) — no legacy rewrites required.
-
-## Phase 3+ Roadmap
-* Worlds 4–8 (gravity flip, portals, security factory, time collapse, final escape).
+## Phase 4+ Roadmap
+* World 6 Security Factory (keys + locked doors + guard patterns).
+* World 7 Time Collapse (many echoes, layered puzzles).
+* World 8 Final Escape (mastery combo of all mechanics).
 * Real audio pack, character animation frames.
-* AdMob SDK + Google Play Billing.
-* Cloud save (Google Play Games / Firebase).
-* Achievements + unlockable robot skins.
-* Full onboarding, accessibility depth, custom control layouts.
+* AdMob SDK + Google Play Billing wiring.
+* Cloud save, achievements, unlockable robot skins.
+* Fill out 100-level content target.
 
 ## Known Limitations
-* 11 of the 100/8-worlds target are shipped. Architecture is ready to scale.
-* Character sprite is static (no per-state animation frames yet).
+* 15 of 100 target levels shipped; architecture is ready to scale.
+* Character sprite is static (no run/jump animation frames yet).
 * Audio calls wired but silent.
-* AdMob / IAP UI are stubs — release build hookup happens pre-Play-Store.
+* AdMob / IAP UI are stubs.
+

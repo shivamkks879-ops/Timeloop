@@ -2,21 +2,22 @@
 
 export type TileChar =
   | "." | "#" | "S" | "G" | "^" | "P" | "D"
-  | "<" | ">" | "n" | "v";  // laser emitters: left/right/up/down
+  | "<" | ">" | "n" | "v"
+  | "~" | "1" | "2";                // gravity flip · portal A · portal B
 
 export interface Laser {
-  tx: number;                       // emitter tile x
-  ty: number;                       // emitter tile y
+  tx: number;
+  ty: number;
   dir: "left" | "right" | "up" | "down";
 }
 
 export interface MovingPlatformDef {
   id: string;
-  x0: number; y0: number;           // start position in tile coords
-  x1: number; y1: number;           // end position in tile coords
-  width: number;                    // tiles wide
-  height: number;                   // tiles tall
-  speed: number;                    // pixels per tick
+  x0: number; y0: number;
+  x1: number; y1: number;
+  width: number;
+  height: number;
+  speed: number;
   trigger: "plate" | "always";
 }
 
@@ -43,7 +44,10 @@ export interface PlayerState {
   wallLock: number;
   alive: boolean;
   facing: number;
-  standingOn: string | null;        // moving platform id currently supporting the actor
+  standingOn: string | null;
+  gravityDir: 1 | -1;                // 1 = gravity down; -1 = gravity up
+  flipCd: number;                    // ticks of flip cooldown
+  teleCd: number;                    // ticks of teleport cooldown
 }
 
 export interface EchoRecording {

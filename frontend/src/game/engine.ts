@@ -127,7 +127,16 @@ function makeActor(x: number, y: number): Actor {
     coyote: 0, buffer: 0, wallLock: 0,
     alive: true, facing: 1,
     standingOn: null,
+    gravityDir: 1, flipCd: 0, teleCd: 0,
   };
+}
+
+// Find the paired portal (`1` <-> `2`) coordinates in the grid, if any.
+function findPortalPair(state: EngineState, targetChar: "1" | "2"): { tx: number; ty: number } | null {
+  for (let y = 0; y < state.height; y++)
+    for (let x = 0; x < state.width; x++)
+      if (state.tiles[y][x] === targetChar) return { tx: x, ty: y };
+  return null;
 }
 
 export function beginNextLoop(state: EngineState): EngineState {
@@ -165,6 +174,7 @@ function isTileSolid(state: EngineState, tx: number, ty: number): boolean {
   if (t === "#" || t === "P") return true;
   if (t === "<" || t === ">" || t === "n" || t === "v") return true;
   if (t === "D") return state.platesPressed.size === 0;
+  // ~, 1, 2 are non-solid interactable tiles
   return false;
 }
 
@@ -236,37 +246,16 @@ function moveX(state: EngineState, a: Actor, dx: number) {
   }
 }
 
-function moveY(state: EngineState, a: Actor, dy: number) {
-  const steps = Math.ceil(Math.abs(dy));
-  const step = steps === 0 ? 0 : dy / steps;
-  for (let i = 0; i < steps; i++) {
-    const ny = a.y + step;
-    if (collidesBox(state, a.x, ny)) {
-      if (step > 0) a.onGround = true;
-      a.vy = 0;
-      return;
-    }
-    a.y = ny;
-  }
+function detectStandingOnLegacy(): null {
+  return null;
 }
 
+// detectWall stays direction-agnostic (walls are walls in either gravity dir).
 function detectWall(state: EngineState, a: Actor): number {
   if (a.onGround) return 0;
   if (collidesBox(state, a.x - 1, a.y)) return -1;
   if (collidesBox(state, a.x + 1, a.y)) return 1;
   return 0;
-}
-
-function detectStandingOn(state: EngineState, a: Actor): string | null {
-  if (!a.onGround) return null;
-  const footY = a.y + PLAYER_H;
-  for (const p of state.platforms) {
-    if (Math.abs(footY - p.py) <= 2 &&
-        a.x < p.px + p.pw && a.x + PLAYER_W > p.px) {
-      return p.def.id;
-    }
-  }
-  return null;
 }
 
 function computePlates(state: EngineState): Set<string> {
@@ -459,10 +448,13 @@ function actorInAnyBeam(state: EngineState, a: Actor): boolean {
 
 function stepActor(state: EngineState, a: Actor, input: number) {
   if (!a.alive) return;
+  if (a.flipCd > 0) a.flipCd -= 1;
+  if (a.teleCd > 0) a.teleCd -= 1;
 
   const left = (input & INPUT.LEFT) !== 0;
   const right = (input & INPUT.RIGHT) !== 0;
   const jumpHeld = (input & INPUT.JUMP) !== 0;
+  const gDir = a.gravityDir;
 
   const dir = (left ? -1 : 0) + (right ? 1 : 0);
   if (a.wallLock > 0) a.wallLock -= 1;
@@ -476,27 +468,92 @@ function stepActor(state: EngineState, a: Actor, input: number) {
 
   if (a.buffer > 0) {
     if (a.coyote > 0) {
-      a.vy = SIM.JUMP_VEL;
+      a.vy = SIM.JUMP_VEL * gDir;
       a.buffer = 0; a.coyote = 0; a.onGround = false;
     } else if (a.wallDir !== 0 && !a.onGround) {
       a.vx = -a.wallDir * SIM.WALL_JUMP_X;
-      a.vy = SIM.WALL_JUMP_Y;
+      a.vy = SIM.WALL_JUMP_Y * gDir;
       a.wallLock = SIM.WALL_JUMP_LOCK_TICKS;
       a.facing = -a.wallDir;
       a.buffer = 0;
     }
   }
-  if (!jumpHeld && a.vy < SIM.JUMP_CUT) a.vy = SIM.JUMP_CUT;
+  // Variable jump: cut velocity if jump released while still rising.
+  if (!jumpHeld && a.vy * gDir < SIM.JUMP_CUT) a.vy = SIM.JUMP_CUT * gDir;
 
-  a.vy += SIM.GRAVITY;
-  if (a.wallDir !== 0 && !a.onGround && a.vy > SIM.WALL_SLIDE_VEL) a.vy = SIM.WALL_SLIDE_VEL;
-  if (a.vy > SIM.MAX_FALL) a.vy = SIM.MAX_FALL;
+  a.vy += SIM.GRAVITY * gDir;
+  if (a.wallDir !== 0 && !a.onGround && a.vy * gDir > SIM.WALL_SLIDE_VEL) {
+    a.vy = SIM.WALL_SLIDE_VEL * gDir;
+  }
+  if (a.vy * gDir > SIM.MAX_FALL) a.vy = SIM.MAX_FALL * gDir;
 
   a.onGround = false;
   moveX(state, a, a.vx);
   moveY(state, a, a.vy);
   a.wallDir = detectWall(state, a);
   a.standingOn = detectStandingOn(state, a);
+
+  // Interact with gravity-flip tiles + teleport portals.
+  interactTiles(state, a);
+}
+
+// If the actor's centre sits on a `~` tile, toggle gravity (respecting cooldown).
+// If it sits on a `1` or `2` tile, teleport to the paired portal (respecting cooldown).
+function interactTiles(state: EngineState, a: Actor) {
+  const cx = a.x + PLAYER_W / 2;
+  const cy = a.y + PLAYER_H / 2;
+  const tx = Math.floor(cx / SIM.TILE);
+  const ty = Math.floor(cy / SIM.TILE);
+  if (tx < 0 || ty < 0 || tx >= state.width || ty >= state.height) return;
+  const t = state.tiles[ty][tx];
+  if (t === "~" && a.flipCd === 0) {
+    a.gravityDir = (a.gravityDir === 1 ? -1 : 1) as 1 | -1;
+    a.flipCd = 20;
+    a.vy = 0;                // avoid launching in the wrong direction
+    a.onGround = false;
+  } else if ((t === "1" || t === "2") && a.teleCd === 0) {
+    const other = findPortalPair(state, t === "1" ? "2" : "1");
+    if (other) {
+      a.x = other.tx * SIM.TILE + (SIM.TILE - PLAYER_W) / 2;
+      a.y = other.ty * SIM.TILE + (SIM.TILE - PLAYER_H) / 2;
+      a.vx = 0; a.vy = 0;
+      a.teleCd = 20;
+    }
+  }
+}
+
+// Detect ground contact: collision moving in the direction of gravity.
+function moveY(state: EngineState, a: Actor, dy: number) {
+  const steps = Math.ceil(Math.abs(dy));
+  const step = steps === 0 ? 0 : dy / steps;
+  for (let i = 0; i < steps; i++) {
+    const ny = a.y + step;
+    if (collidesBox(state, a.x, ny)) {
+      // Ground when we hit a solid in the direction of gravity.
+      if ((step > 0 && a.gravityDir > 0) || (step < 0 && a.gravityDir < 0)) {
+        a.onGround = true;
+      }
+      a.vy = 0;
+      return;
+    }
+    a.y = ny;
+  }
+}
+
+// Detect which platform (if any) the actor is currently standing on.
+// For flipped gravity, the actor's "feet" are the TOP of their AABB and the
+// platform's supporting surface is the platform's BOTTOM edge.
+function detectStandingOn(state: EngineState, a: Actor): string | null {
+  if (!a.onGround) return null;
+  const supportY = a.gravityDir === 1 ? a.y + PLAYER_H : a.y;
+  for (const p of state.platforms) {
+    const surface = a.gravityDir === 1 ? p.py : p.py + p.ph;
+    if (Math.abs(supportY - surface) <= 2 &&
+        a.x < p.px + p.pw && a.x + PLAYER_W > p.px) {
+      return p.def.id;
+    }
+  }
+  return null;
 }
 
 // ---------- Public step ----------

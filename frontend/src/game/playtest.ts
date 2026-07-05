@@ -114,6 +114,18 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
     { ticks: 130 },
     { ticks: 150, right: true },
   ],
+
+  // 4-1: Walk into flip tile, rise to ceiling, walk right to goal.
+  "4-1": [{ ticks: 260, right: true }],
+
+  // 4-2: Flip, cross ceiling, second flip drops onto safe floor past spike pit.
+  "4-2": [{ ticks: 320, right: true }],
+
+  // 5-1: Walk into portal, warp to twin, continue to goal.
+  "5-1": [{ ticks: 200, right: true }],
+
+  // 5-2: Warp past a vertical laser to the twin, continue to goal.
+  "5-2": [{ ticks: 200, right: true }],
 };
 
 export interface PlaytestResult {
