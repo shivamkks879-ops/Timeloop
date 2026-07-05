@@ -1,0 +1,106 @@
+{
+  "theme": "Dark",
+  "archetype": "7 (Electric & Neon)",
+  "design_philosophy": "Layered darkness with selective neon illumination. High-end, premium sci-fi aesthetic. Pure black is avoided in favor of deep space blue-gray to create depth. Focus on 2.5D puzzle platformer clarity in landscape mode.",
+  "colors": {
+    "background": {
+      "base_void": "#0A0B10",
+      "panel_elevated": "#161824",
+      "overlay_glass": "rgba(10, 11, 16, 0.85)"
+    },
+    "neon": {
+      "cyan_primary": "#00E5FF",
+      "purple_echo": "#9D00FF",
+      "red_hazard": "#FF003C",
+      "green_success": "#00FF88",
+      "white_core": "#FFFFFF"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#8A93A6",
+      "muted": "#4B5263"
+    },
+    "ui_elements": {
+      "border_glow": "rgba(0, 229, 255, 0.3)",
+      "echo_ghost_tint": "rgba(157, 0, 255, 0.5)"
+    }
+  },
+  "typography": {
+    "hud_timer": {
+      "fontFamily": "Orbitron",
+      "weight": "900",
+      "usage": "10.00s countdown on HUD. Must use tabular numbers or fixed widths for stability."
+    },
+    "headings": {
+      "fontFamily": "Exo 2",
+      "weight": "800",
+      "usage": "Main menu, Level Select numbers, Pause menu titles."
+    },
+    "body": {
+      "fontFamily": "Outfit",
+      "weight": "400",
+      "usage": "Settings text, hints, secondary UI text."
+    }
+  },
+  "hud_layout_landscape": {
+    "safe_areas": "MANDATORY: Wrap HUD in SafeAreaView. Leave minimum 32px padding from left/right edges to avoid notches/bezels.",
+    "top_center": "Timer (e.g., 10.00s). Largest HUD element. Orbitron font. Glows Cyan, pulses Red when under 3 seconds.",
+    "top_left": "Echo Counter (Robot Head Icon + x2/3) and Pause Button.",
+    "top_right": "Restart Level Button (Circular icon with counter-clockwise arrow).",
+    "touch_controls": {
+      "left_zone": "Bottom-left 40% of screen. Visualized by Left/Right D-Pad arrows. Opacity 30%.",
+      "right_zone": "Bottom-right 40% of screen. Visualized by massive Jump button (^). Opacity 30%."
+    }
+  },
+  "screen_layouts": {
+    "main_menu": "Centered layout. Enormous 'Time Loop Escape' logo. Vertical stack of buttons: Play, Level Select, Settings. Anchored at bottom right: Rewarded Ad / Remove Ads (Stubbed).",
+    "level_select": "Grid layout (flex-row, flex-wrap). Square level nodes. Locked nodes are dimmed (#161824) with a lock icon. Unlocked nodes have a cyan border and 1-3 success green stars below them.",
+    "pause_overlay": "Absolute fill backdrop blur. Centered vertical menu: Resume, Settings, Quit to Menu. Dark elevated panel with neon cyan border.",
+    "level_complete": "Slide-in panel. Large S/A/B/C Grade stamp. Star pop-in animation. Next Level and Retry buttons side-by-side.",
+    "settings": "Simple panel. Audio toggles (SFX/Music), Controls layout (Adjust touch zones), Accessibility (High contrast mode)."
+  },
+  "gameplay_visual_specs": {
+    "robot_character": "Cute futuristic robot. White chassis, rounded silhouette (like Eve from Wall-E). Large visor that glows neon cyan (#00E5FF).",
+    "echo_ghost": "Previous actions clone. Rendered at 50% opacity, tinted entirely in neon purple (#9D00FF) using Skia ColorMatrix. Leaves a subtle purple particle trail.",
+    "environment_tiles": "Sci-fi laboratory. Dark metal grates and platforms (#161824). Edges of platforms have a 1px cyan highlight to define collision boundaries.",
+    "hazards_and_interactables": {
+      "lasers": "Solid white core (2px) with heavy neon red Skia blur (8px).",
+      "pressure_plates": "Flat switches that glow cyan when unpressed, green when pressed.",
+      "doors": "Energy gates that dissolve (opacity fade + particles) when unlocked."
+    },
+    "skia_effects": {
+      "soft_bloom": "Use @shopify/react-native-skia Blur filters underneath text and lasers.",
+      "time_rewind": "When timer hits 0, trigger a chromatic aberration shader (split RGB) and scale effect, rewind positions quickly, then resume.",
+      "particles": "Neon cyan dust floating in the background, rendering using Skia points."
+    }
+  },
+  "image_urls": {
+    "background_tunnel": {
+      "url": "https://images.unsplash.com/photo-1714283339889-8130f4b92970?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "description": "Blue neon hex tunnel. Great for Main Menu background or parallax.",
+      "category": "environment"
+    },
+    "robot_reference": {
+      "url": "https://images.pexels.com/photos/8566521/pexels-photo-8566521.jpeg",
+      "description": "White humanoid robot with glowing blue lights.",
+      "category": "character"
+    },
+    "portal_effect": {
+      "url": "https://images.unsplash.com/photo-1737819505350-9f1b39c05c70?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "description": "Purple spiral portal effect. Good reference for spawn/exit doors.",
+      "category": "vfx"
+    }
+  },
+  "testing_attributes": {
+    "rule": "All interactive elements must use BOTH 'testID' and 'data-testid' attributes (for React Native and Web compat).",
+    "examples": ["testID=\"btn-play\" data-testid=\"btn-play\"", "testID=\"btn-pause\" data-testid=\"btn-pause\"", "testID=\"level-node-1\" data-testid=\"level-node-1\""]
+  },
+  "instructions_to_main_agent": [
+    "Lock app orientation to landscape (via app.json).",
+    "Write components in .js files (NOT .tsx).",
+    "Use @shopify/react-native-skia for the 2.5D game world and soft bloom rendering.",
+    "Do NOT use Shadcn UI or HTML tags (div, span). This is a React Native app. Use View, Text, StyleSheet, Pressable.",
+    "Manage the 10s Timer + Echo rewinding system using requestAnimationFrame and a deterministic state array.",
+    "Implement custom buttons using Pressable with scale animations instead of standard Button components."
+  ]
+}
