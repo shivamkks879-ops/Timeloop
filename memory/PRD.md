@@ -9,6 +9,19 @@ A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 s
 * **Phase 3** (Worlds 4 & 5) — shipped.
 * **Phase 4** (Worlds 6 & 7) — shipped.
 * **Phase 5.1** (Audio pack + Character animations) — shipped.
+* **Phase 5.2** (World 8 mechanics + first 5 W8 levels) — shipped.
+
+## Phase 5.2 additions
+* New engine mechanics:
+  - **Time Rifts** (`R` / `r`) — tiles that toggle solid/passable based on loop parity. `R` is solid on even loops, `r` on odd. Forces multi-loop planning where the same layout is *literally* different geometry between echoes.
+  - **Warden Sentries** — patrolling drones defined per level via waypoints + speed. Kill alive actors on contact. Can be **stalled** by dead echo bodies (no combat — cooperative sacrifice mechanic).
+  - **Boss Plates** (`B`) — persistent-across-loops trigger plates. Once pressed by any actor in any loop, stays pressed. Foundation for multi-phase boss encounters.
+* World 8 · Final Escape (5/16 levels): 8-1 Rift Walker, 8-2 Twin Rifts, 8-3 Warden Patrol, 8-4 Rift and Ruin, 8-5 Rift Locksmith.
+* Level Select revamped: scrollable, grouped by world with headered blocks — ready to scale to 100 levels.
+* **24/24 levels PASS** automated headless playtest.
+
+## Content shipped
+Total: **24 handcrafted levels** across **8 worlds**.
 
 ## Phase 5 progress
 * Real audio pack via `expo-audio`: 9 SFX (jump/land/rewind/echo/portal/laser/win/die/ui_tap) + 8s synthwave music loop, all bundled locally under `/app/frontend/assets/audio/`. Preloaded at app boot; SFX use `seekTo(0)+play()` on the hot path with zero allocations. Wired into: rewind/echo-create/win/die (already), and new: jump, land, portal, key-pickup, mid-loop laser death, and all UI button taps.

@@ -156,6 +156,35 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
     { ticks: 30 },
     { ticks: 260, right: true },
   ],
+
+  // ─────────────────────── WORLD 8 · Final Escape ───────────────────────────
+  // 8-1: R rift at col 10. Loop 0 blocked. Loop 1 open — walk right.
+  "8-1": [
+    { ticks: 600, right: true },     // loop 0: hit R, wait for timer
+    { ticks: 250, right: true },     // loop 1: cross open R, reach G
+  ],
+
+  // 8-2: Two R rifts at cols 7 and 15. Same parity; loop 1 opens both.
+  "8-2": [
+    { ticks: 600, right: true },
+    { ticks: 260, right: true },
+  ],
+
+  // 8-3: Flip to ceiling at col 4, walk across, flip back at col 22 (last col).
+  //      Sentry patrols floor cols 10-16 — no threat on ceiling.
+  "8-3": [{ ticks: 320, right: true }],
+
+  // 8-4: Same trick — flip up at col 3, ceiling road past R and sentry, flip down at col 22.
+  "8-4": [
+    { ticks: 600, right: true },     // loop 0: run + flip, may not reach G in time
+    { ticks: 300, right: true },     // loop 1: R rift now passable too — cruise
+  ],
+
+  // 8-5: Grab key + hit R rift on loop 0, cross R + unlock L on loop 1.
+  "8-5": [
+    { ticks: 600, right: true },     // loop 0: pick up key at col 5, blocked at R
+    { ticks: 300, right: true },     // loop 1: R open, key already held, unlock L, reach G
+  ],
 };
 
 export interface PlaytestResult {

@@ -69,7 +69,7 @@ export default function MainMenu() {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>WORLD 1 · LEARNING TIME · 5 LEVELS</Text>
+          <Text style={styles.footerText}>8 WORLDS · {LEVELS.length} LEVELS · TIME LOOP ESCAPE</Text>
           {ready ? <AdsBar removeAds={save.removeAds} onChange={() => setTick((t) => t + 1)} /> : null}
         </View>
       </SafeAreaView>

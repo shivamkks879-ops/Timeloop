@@ -19,10 +19,16 @@ import type {
   MovingPlatformDef,
   PlatformState,
   PlayerState,
+  SentryDef,
+  SentryState,
   TileChar,
 } from "./types";
 
 export type Actor = PlayerState;
+
+// Sentry visual bounding box (slightly smaller than a tile).
+export const SENTRY_W = 26;
+export const SENTRY_H = 26;
 
 export interface EngineState {
   level: LevelDef;
@@ -44,6 +50,8 @@ export interface EngineState {
   beams: LaserBeam[];
   keyCollected: boolean;
   collectedKeys: Set<string>;       // tile coords "x,y" of consumed key tiles
+  sentries: SentryState[];
+  bossPressed: Set<string>;         // persistent boss plates across all loops
 }
 
 // Player AABB (slightly smaller than a tile so wall play feels forgiving)
@@ -121,6 +129,22 @@ export function initEngine(level: LevelDef): EngineState {
     beams: [],
     keyCollected: false,
     collectedKeys: new Set(),
+    sentries: (level.sentries ?? []).map(makeSentryState),
+    bossPressed: new Set(),
+  };
+}
+
+function makeSentryState(def: SentryDef): SentryState {
+  const phase = def.phase0 ?? 0;
+  const px = def.x0 * SIM.TILE + (SIM.TILE - SENTRY_W) / 2;
+  const py = def.y0 * SIM.TILE + (SIM.TILE - SENTRY_H) / 2;
+  return {
+    def,
+    phase,
+    dir: 1,
+    px: px + (def.x1 - def.x0) * SIM.TILE * phase,
+    py: py + (def.y1 - def.y0) * SIM.TILE * phase,
+    stalled: false,
   };
 }
 
@@ -162,6 +186,10 @@ export function beginNextLoop(state: EngineState): EngineState {
     platesPressed: new Set(),
     platforms: (state.level.platforms ?? []).map(makePlatformState),
     beams: [],
+    // Sentries reset to their initial pose each loop (deterministic).
+    sentries: (state.level.sentries ?? []).map(makeSentryState),
+    // Boss plates PERSIST across loops (that's the whole point of boss phases).
+    bossPressed: state.bossPressed,
     status: "playing",
   };
 }
@@ -179,6 +207,16 @@ function isTileSolid(state: EngineState, tx: number, ty: number): boolean {
   if (t === "<" || t === ">" || t === "n" || t === "v") return true;
   if (t === "D") return state.platesPressed.size === 0;
   if (t === "L") return !state.keyCollected;
+  // Time Rifts: `R` = solid on EVEN loops (0, 2, ...), passable on odd.
+  //             `r` = solid on ODD  loops (1, 3, ...), passable on even.
+  if (t === "R") return state.loop % 2 === 0;
+  if (t === "r") return state.loop % 2 === 1;
+  // Boss trigger: unlocks a linked door when ALL boss plates in the level
+  // are pressed at least once (persistent). While unpressed, the tile is solid.
+  if (t === "B") {
+    const id = `${tx},${ty}`;
+    return !state.bossPressed.has(id);
+  }
   // ~, 1, 2, k are non-solid interactable tiles
   return false;
 }
@@ -533,7 +571,61 @@ function interactTiles(state: EngineState, a: Actor) {
       // Blank out the tile so it disappears visually + logically for the loop.
       state.tiles[ty][tx] = ".";
     }
+  } else if (t === "B") {
+    // Boss trigger plate — persistent across loops. Once pressed by any actor,
+    // stays pressed for the rest of the run.
+    const id = `${tx},${ty}`;
+    if (!state.bossPressed.has(id)) {
+      state.bossPressed.add(id);
+      state.tiles[ty][tx] = ".";
+    }
   }
+}
+
+// ---------- Sentry logic ----------
+// Sentries patrol between two tile waypoints at a fixed speed. If a dead echo
+// body is in their forward path, they stall (creating the puzzle: sacrifice
+// an echo to block a sentry).
+function updateSentries(state: EngineState) {
+  for (const s of state.sentries) {
+    const ax = s.def.x0 * SIM.TILE + (SIM.TILE - SENTRY_W) / 2;
+    const ay = s.def.y0 * SIM.TILE + (SIM.TILE - SENTRY_H) / 2;
+    const bx = s.def.x1 * SIM.TILE + (SIM.TILE - SENTRY_W) / 2;
+    const by = s.def.y1 * SIM.TILE + (SIM.TILE - SENTRY_H) / 2;
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len <= 0) { s.stalled = false; continue; }
+
+    // Advance phase; ping-pong at endpoints.
+    const deltaPhase = s.def.speed / len;
+    let candidate = s.phase + s.dir * deltaPhase;
+    if (candidate >= 1) { candidate = 1; s.dir = -1; }
+    if (candidate <= 0) { candidate = 0; s.dir = 1; }
+    const candPx = ax + (bx - ax) * candidate;
+    const candPy = ay + (by - ay) * candidate;
+
+    // Check if a dead echo body blocks the sentry's next position.
+    let blocked = false;
+    for (const e of state.echoes) {
+      if (e.alive) continue;
+      if (aabbOverlap(candPx, candPy, SENTRY_W, SENTRY_H, e.x, e.y, PLAYER_W, PLAYER_H)) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) {
+      s.stalled = true;
+      // Do not advance phase — sentry waits at current position.
+      continue;
+    }
+    s.stalled = false;
+    s.phase = candidate;
+    s.px = candPx;
+    s.py = candPy;
+  }
+}
+
+function sentryTouches(a: Actor, s: SentryState): boolean {
+  return aabbOverlap(a.x, a.y, PLAYER_W, PLAYER_H, s.px, s.py, SENTRY_W, SENTRY_H);
 }
 
 // Detect ground contact: collision moving in the direction of gravity.
@@ -577,6 +669,7 @@ export function step(state: EngineState, playerInput: number): EngineState {
 
   updatePlatforms(state);
   carryActors(state);
+  updateSentries(state);
 
   state.currentInputs[state.tick] = playerInput;
 
@@ -590,16 +683,22 @@ export function step(state: EngineState, playerInput: number): EngineState {
   state.platesPressed = computePlates(state);
   state.beams = computeBeams(state);
 
-  // Deaths: hazards + laser hits.
+  // Deaths: hazards + laser hits + sentries.
   const allActors: Actor[] = [state.player, ...state.echoes];
   for (const a of allActors) {
     if (!a.alive) continue;
     if (touchesHazard(state, a)) { a.alive = false; continue; }
     // Killed by beam if we're in the beam segment OR we are the terminator.
+    let killed = false;
     for (const b of state.beams) {
-      if (b.hitActor === a) { a.alive = false; break; }
+      if (b.hitActor === a) { a.alive = false; killed = true; break; }
       const { bx, by, bw, bh } = beamAABB(b);
-      if (aabbOverlap(a.x, a.y, PLAYER_W, PLAYER_H, bx, by, bw, bh)) { a.alive = false; break; }
+      if (aabbOverlap(a.x, a.y, PLAYER_W, PLAYER_H, bx, by, bw, bh)) { a.alive = false; killed = true; break; }
+    }
+    if (killed) continue;
+    // Killed by an active sentry (only alive/moving sentries kill; stalled ones still kill on contact).
+    for (const s of state.sentries) {
+      if (sentryTouches(a, s)) { a.alive = false; break; }
     }
   }
 

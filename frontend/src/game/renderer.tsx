@@ -176,11 +176,50 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
               <Rect x={px + 10} y={py + 2} width={SIM.TILE - 20} height={SIM.TILE - 4} color={COLORS.white} opacity={0.35} />
             </Group>
           );
+        } else if (t === "R" || t === "r") {
+          // Time Rift: R = solid on even loops, r = solid on odd loops.
+          const solid = t === "R" ? state.loop % 2 === 0 : state.loop % 2 === 1;
+          const tint = t === "R" ? COLORS.cyan : COLORS.purple;
+          nodes.push(
+            <Group key={`rf${x},${y}`}>
+              {solid ? (
+                <>
+                  <RoundedRect x={px + 1} y={py + 1} width={SIM.TILE - 2} height={SIM.TILE - 2} r={4} color={tint} opacity={0.35} />
+                  <RoundedRect x={px + 1} y={py + 1} width={SIM.TILE - 2} height={SIM.TILE - 2} r={4} color={tint} style="stroke" strokeWidth={1.5}>
+                    <Blur blur={2} />
+                  </RoundedRect>
+                  {/* Glyph */}
+                  <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={4} color={COLORS.white} opacity={0.9} />
+                  <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={7} color={tint} style="stroke" strokeWidth={1} opacity={0.7} />
+                </>
+              ) : (
+                <>
+                  {/* Ghost outline shows the door is currently OPEN */}
+                  <RoundedRect x={px + 3} y={py + 3} width={SIM.TILE - 6} height={SIM.TILE - 6} r={4} color={tint} style="stroke" strokeWidth={1} opacity={0.35}>
+                    <Blur blur={2} />
+                  </RoundedRect>
+                  <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={2} color={tint} opacity={0.5} />
+                </>
+              )}
+            </Group>
+          );
+        } else if (t === "B") {
+          // Boss trigger plate — persistent across loops. Bright orange/red glow.
+          const pressed = false; // once pressed, tile is blanked so this branch never fires
+          nodes.push(
+            <Group key={`bp${x},${y}`}>
+              <RoundedRect x={px + 2} y={py + 2} width={SIM.TILE - 4} height={SIM.TILE - 4} r={5} color="#3A1002" />
+              <RoundedRect x={px + 4} y={py + 4} width={SIM.TILE - 8} height={SIM.TILE - 8} r={4} color="#FF7A00" opacity={pressed ? 0.3 : 0.85}>
+                <Blur blur={pressed ? 6 : 3} />
+              </RoundedRect>
+              <Circle cx={px + SIM.TILE / 2} cy={py + SIM.TILE / 2} r={4} color={COLORS.white} opacity={0.9} />
+            </Group>
+          );
         }
       }
     }
     return nodes;
-  }, [state.tiles, state.height, state.width, state.platesPressed, state.keyCollected]);
+  }, [state.tiles, state.height, state.width, state.platesPressed, state.keyCollected, state.loop, state.bossPressed]);
 
   const platformNodes = state.platforms.map((p) => (
     <Group key={p.def.id}>
@@ -189,6 +228,28 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         <Blur blur={2} />
       </RoundedRect>
       <Rect x={p.px + 4} y={p.py + 3} width={p.pw - 8} height={2} color={COLORS.cyan} opacity={0.6} />
+    </Group>
+  ));
+
+  const sentryNodes = state.sentries.map((s) => (
+    <Group key={`sn${s.def.id}`}>
+      {/* Danger glow */}
+      <RoundedRect x={s.px - 3} y={s.py - 3} width={26 + 6} height={26 + 6} r={10} color={COLORS.red} opacity={s.stalled ? 0.22 : 0.4}>
+        <Blur blur={s.stalled ? 4 : 7} />
+      </RoundedRect>
+      {/* Hull */}
+      <RoundedRect x={s.px} y={s.py} width={26} height={26} r={6} color={s.stalled ? "#3A1620" : "#5A1830"} />
+      <RoundedRect x={s.px} y={s.py} width={26} height={26} r={6} color={COLORS.red} style="stroke" strokeWidth={1.5} opacity={0.9} />
+      {/* Eye (facing toward motion dir) */}
+      <Circle
+        cx={s.px + 13 + (s.dir > 0 ? 4 : -4)}
+        cy={s.py + 13}
+        r={3}
+        color={s.stalled ? COLORS.textMuted : COLORS.red}
+      >
+        <Blur blur={2} />
+      </Circle>
+      <Circle cx={s.px + 13} cy={s.py + 13} r={1.5} color={COLORS.white} opacity={0.9} />
     </Group>
   ));
 
@@ -252,6 +313,7 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         <Rect x={0} y={0} width={worldW} height={worldH} color={COLORS.cyan} opacity={0.03} />
         {tileNodes}
         {platformNodes}
+        {sentryNodes}
         {beamNodes}
         {echoes}
         <RobotSprite actor={state.player} frame={animFrame} pose={playerPose} />

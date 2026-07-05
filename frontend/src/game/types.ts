@@ -4,7 +4,9 @@ export type TileChar =
   | "." | "#" | "S" | "G" | "^" | "P" | "D"
   | "<" | ">" | "n" | "v"
   | "~" | "1" | "2"
-  | "k" | "L";                      // key · locked door
+  | "k" | "L"                       // key · locked door
+  | "R" | "r"                       // Time Rift phase 0 · phase 1
+  | "B";                            // Boss trigger plate (persistent across loops)
 
 export interface Laser {
   tx: number;
@@ -22,6 +24,26 @@ export interface MovingPlatformDef {
   trigger: "plate" | "always";
 }
 
+// Warden sentry — patrols between waypoints. Kills alive actors on contact.
+// Can be stopped ("stalled") by a dead echo body blocking its path — this is
+// how the no-combat puzzle language lets the player disable a sentry.
+export interface SentryDef {
+  id: string;
+  x0: number; y0: number;           // waypoint A (tile coords)
+  x1: number; y1: number;           // waypoint B (tile coords)
+  speed: number;                    // pixels / tick
+  phase0?: number;                  // 0..1 initial phase (default 0)
+}
+
+export interface SentryState {
+  def: SentryDef;
+  phase: number;                    // 0..1 along waypoint segment
+  dir: 1 | -1;                      // ping-pong direction
+  px: number;                       // current top-left x (pixels)
+  py: number;                       // current top-left y (pixels)
+  stalled: boolean;                 // blocked by dead echo this tick
+}
+
 export interface LevelDef {
   id: string;
   name: string;
@@ -31,6 +53,7 @@ export interface LevelDef {
   maxEchoes: number;
   parEchoes: number;
   platforms?: MovingPlatformDef[];
+  sentries?: SentryDef[];
 }
 
 export interface PlayerState {
