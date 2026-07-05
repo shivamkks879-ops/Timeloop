@@ -1,45 +1,83 @@
 // Shared game types
 
 export type TileChar =
-  | "." | "#" | "S" | "G" | "^" | "P" | "D" | "="; // "=" = one-way platform (future)
+  | "." | "#" | "S" | "G" | "^" | "P" | "D"
+  | "<" | ">" | "n" | "v";  // laser emitters: left/right/up/down
+
+export interface Laser {
+  tx: number;                       // emitter tile x
+  ty: number;                       // emitter tile y
+  dir: "left" | "right" | "up" | "down";
+}
+
+export interface MovingPlatformDef {
+  id: string;
+  x0: number; y0: number;           // start position in tile coords
+  x1: number; y1: number;           // end position in tile coords
+  width: number;                    // tiles wide
+  height: number;                   // tiles tall
+  speed: number;                    // pixels per tick
+  trigger: "plate" | "always";
+}
 
 export interface LevelDef {
   id: string;
   name: string;
   hint: string;
   world: number;
-  grid: string[];         // rows of tiles, top -> bottom
-  maxEchoes: number;      // echo budget (levels can require >=1 echo)
-  parEchoes: number;      // for grading S = <=par
+  grid: string[];
+  maxEchoes: number;
+  parEchoes: number;
+  platforms?: MovingPlatformDef[];
 }
 
 export interface PlayerState {
-  x: number;              // logical pixels
+  x: number;
   y: number;
   vx: number;
   vy: number;
   onGround: boolean;
-  wallDir: number;        // -1 wall on left, 1 wall on right, 0 none
-  coyote: number;         // remaining coyote ticks
-  buffer: number;         // remaining jump-buffer ticks
-  wallLock: number;       // remaining wall-jump lock (ignores horizontal input)
+  wallDir: number;
+  coyote: number;
+  buffer: number;
+  wallLock: number;
   alive: boolean;
-  facing: number;         // -1 or 1
+  facing: number;
+  standingOn: string | null;        // moving platform id currently supporting the actor
 }
 
 export interface EchoRecording {
-  inputs: Uint8Array;     // length = LOOP_TICKS
+  inputs: Uint8Array;
   spawnX: number;
   spawnY: number;
+}
+
+export interface PlatformState {
+  def: MovingPlatformDef;
+  phase: number;                    // 0..1 (0 = at start, 1 = at end)
+  osciDir: 1 | -1;                  // for "always" trigger oscillation direction
+  px: number;                       // current top-left x (pixels)
+  py: number;                       // current top-left y (pixels)
+  pw: number;                       // pixel width
+  ph: number;                       // pixel height
+  dx: number;                       // delta this tick
+  dy: number;                       // delta this tick
+}
+
+export interface LaserBeam {
+  laser: Laser;
+  x1: number; y1: number;
+  x2: number; y2: number;
+  hitActor: PlayerState | null;     // the alive/dead actor that terminates this beam
 }
 
 export type GameStatus = "playing" | "won" | "dead";
 
 export interface LevelSave {
   completed: boolean;
-  bestEchoes: number;     // fewer is better
+  bestEchoes: number;
   grade: "S" | "A" | "B" | "C" | null;
-  stars: number;          // 0..3
+  stars: number;
 }
 
 export interface SaveData {

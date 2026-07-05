@@ -43,24 +43,76 @@ export const SOLUTIONS: Record<string, InputSegment[]> = {
     { ticks: 200, right: true },
   ],
 
-  // 1-3: Ledge at row 5-6 cols 16-21. Actually goal is at row 7 col 19 - just
-  // walk right along the ground; the ledge sits above and doesn't block us.
+  // 1-3: Just walk right along the ground; ledge sits above.
   "1-3": [{ ticks: 220, right: true }],
 
-  // 1-4: Plate at col 5 (floor), door at col 10 rows 6-7, goal at col 22.
-  // Player width 22px + tile 32 -> need to STOP with body over col 5.
-  // Loop 1 - walk onto plate and idle. Loop 2 - echo replays; player runs through.
+  // 1-4: Loop 1 - walk onto plate and idle. Loop 2 - echo replays; player runs through.
   "1-4": [
     { ticks: 50, right: true },     // reach plate: 50*3.6 = 180 px, spans cols 5-6
-    { ticks: 550 },                 // idle on plate for the rest of loop 1
-    { ticks: 600, right: true },    // loop 2: run all the way to goal
+    { ticks: 550 },
+    { ticks: 600, right: true },
   ],
 
   // 1-5: Plate at col 3, two doors at cols 10 and 16, goal at col 22.
   "1-5": [
-    { ticks: 30, right: true },     // 30*3.6 = 108 px, spans cols 3-4 (plate at col 3)
+    { ticks: 30, right: true },
     { ticks: 570 },
     { ticks: 600, right: true },
+  ],
+
+  // 2-1: Vertical laser at col 10 row 3. Loop 1 die at beam. Loop 2 echo blocks, player crosses.
+  // Beam center x = 336. Player width 22 hits beam at x ~314 (right edge in beam column).
+  "2-1": [
+    { ticks: 120, right: true },        // walk into beam - die at ~tick 86
+    // spillover continues into loop 2 (player continues right through echo,
+    // but the echo dies same place so beam gets blocked before player arrives).
+    // Add a small wait so echo dies BEFORE the player reaches the beam.
+    { ticks: 25 },                       // pause so live player is behind dead echo
+    { ticks: 220, right: true },
+  ],
+
+  // 2-2: Two lasers at col 6 and col 14. Two sacrifices required.
+  "2-2": [
+    { ticks: 80, right: true },          // die at first beam
+    { ticks: 30 },                       // wait
+    { ticks: 130, right: true },         // walk past first echo, die at second beam
+    { ticks: 40 },                       // wait for both echoes to die and block
+    { ticks: 260, right: true },
+  ],
+
+  // 2-3: Plate col 3 row 8. Door col 6 rows 6-7. Laser col 12 row 3. Goal col 22.
+  "2-3": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 110, right: true },
+    { ticks: 40 },
+    { ticks: 300, right: true },
+  ],
+
+  // 3-1: Always-oscillating platform. Board at col 5-6, ride to col 14, walk off.
+  "3-1": [
+    { ticks: 55, right: true },
+    { ticks: 235 },
+    { ticks: 100, right: true },
+  ],
+
+  // 3-2: Plate col 2 row 8. Platform col 5→14. Loop 1 park on plate.
+  //      Loop 2 echo holds plate; player boards platform, rides, walks off.
+  "3-2": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 80, right: true },
+    { ticks: 130 },
+    { ticks: 100, right: true },
+  ],
+
+  // 3-3: Same rhythm as 3-2 with a plate-controlled door on the far side.
+  "3-3": [
+    { ticks: 25, right: true },
+    { ticks: 575 },
+    { ticks: 80, right: true },
+    { ticks: 130 },
+    { ticks: 150, right: true },
   ],
 };
 
