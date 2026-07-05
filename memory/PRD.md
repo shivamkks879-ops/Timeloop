@@ -8,6 +8,11 @@ A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 s
 * **Phase 2** (Worlds 2 & 3) — shipped.
 * **Phase 3** (Worlds 4 & 5) — shipped.
 * **Phase 4** (Worlds 6 & 7) — shipped.
+* **Phase 5.1** (Audio pack + Character animations) — shipped.
+
+## Phase 5 progress
+* Real audio pack via `expo-audio`: 9 SFX (jump/land/rewind/echo/portal/laser/win/die/ui_tap) + 8s synthwave music loop, all bundled locally under `/app/frontend/assets/audio/`. Preloaded at app boot; SFX use `seekTo(0)+play()` on the hot path with zero allocations. Wired into: rewind/echo-create/win/die (already), and new: jump, land, portal, key-pickup, mid-loop laser death, and all UI button taps.
+* Character animation frames — Skia vector robot (`character.tsx`) with 8 analytically-derived poses (idle · run · jump · fall · wall_slide · land · victory · dead). Uses monotonic engine tick as animation clock so **Echo animations replay perfectly in phase** with the original run. Includes antenna sway, thruster jets on jump, wall-slide sparks, victory sparkles, dead X eyes.
 
 ## Content shipped
 

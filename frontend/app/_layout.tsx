@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { LogBox, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { initAudio, setMusicEnabled, setSfxEnabled, startMusic } from "@/src/game/audio";
+import { loadSave } from "@/src/game/save";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 
 // Silence dev logbox overlays so the game canvas stays clean.
@@ -53,6 +55,29 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded, error, skiaReady]);
+
+  // Preload the audio pack once at boot and honour the saved audio preference.
+  // Music starts on Android/iOS automatically; on web the browser may block
+  // playback until the user taps something — we call startMusic() again from
+  // the first UI Pressable in that case.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const save = await loadSave();
+        await initAudio();
+        if (cancelled) return;
+        setSfxEnabled(save.audioOn);
+        setMusicEnabled(save.audioOn);
+        if (save.audioOn) startMusic();
+      } catch (e) {
+        if (__DEV__) console.warn("[audio] init failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if ((!loaded && !error) || !skiaReady) return null;
 

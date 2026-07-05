@@ -9,7 +9,7 @@
 //   6. Echoes (semi-transparent purple ghosts, dead ones dimmer)
 //   7. Player robot
 
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import {
   Canvas, Group, Rect, RoundedRect, Circle, Path, Skia,
   Blur, vec, LinearGradient,
@@ -18,6 +18,7 @@ import {
 import { COLORS, SIM } from "./constants";
 import type { EngineState, Actor } from "./engine";
 import { PLAYER_W, PLAYER_H } from "./engine";
+import { RobotSprite, derivePose, type Pose } from "./character";
 
 interface Props {
   state: EngineState;
@@ -34,6 +35,10 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
   const drawH = worldH * scale;
   const offX = (width - drawW) / 2;
   const offY = (height - drawH) / 2;
+
+  // Deterministic animation clock — monotonically increases across loops so
+  // echo animations replay in phase with the original run.
+  const animFrame = state.tick + state.loop * SIM.LOOP_TICKS;
 
   const tileNodes = useMemo(() => {
     const nodes: React.ReactNode[] = [];
@@ -204,18 +209,34 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
     );
   });
 
-  const echoes = state.echoes.map((e, i) => (
-    <ActorSprite
-      key={`e${i}`}
-      x={e.x}
-      y={e.y}
-      facing={e.facing}
-      color={COLORS.purple}
-      opacity={e.alive ? 0.55 : 0.32}
-      echo
-      flipped={e.gravityDir === -1}
-    />
-  ));
+  const echoes = state.echoes.map((e, i) => {
+    const pose = derivePose(e, "playing", -1, animFrame);
+    return (
+      <RobotSprite
+        key={`e${i}`}
+        actor={e}
+        frame={animFrame + i * 7}
+        pose={pose}
+        echo
+        echoAlive={e.alive}
+      />
+    );
+  });
+
+  // Track landing tick for the "land" squash pose.
+  const landRef = useRef<{ ground: boolean; tick: number }>({ ground: true, tick: -100 });
+  const wasGround = landRef.current.ground;
+  if (!wasGround && state.player.onGround) {
+    landRef.current.tick = animFrame;
+  }
+  landRef.current.ground = state.player.onGround;
+
+  const playerPose: Pose = derivePose(
+    state.player,
+    state.status,
+    landRef.current.tick,
+    animFrame,
+  );
 
   return (
     <Canvas style={{ width, height }}>
@@ -233,39 +254,20 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         {platformNodes}
         {beamNodes}
         {echoes}
-        {state.player.alive ? (
-          <ActorSprite x={state.player.x} y={state.player.y} facing={state.player.facing} color={COLORS.white} opacity={1} flipped={state.player.gravityDir === -1} />
-        ) : (
-          <ActorSprite x={state.player.x} y={state.player.y} facing={state.player.facing} color={COLORS.red} opacity={0.5} flipped={state.player.gravityDir === -1} />
-        )}
+        <RobotSprite actor={state.player} frame={animFrame} pose={playerPose} />
       </Group>
     </Canvas>
   );
 }
 
-function ActorSprite({
-  x, y, facing, color, opacity, echo, flipped,
-}: {
+function ActorSprite_LEGACY_UNUSED(_props: {
   x: number; y: number; facing: number; color: string; opacity: number; echo?: boolean; flipped?: boolean;
 }) {
-  const w = PLAYER_W;
-  const h = PLAYER_H;
-  const visorColor = echo ? COLORS.purple : COLORS.cyan;
-  // When gravity is flipped, put the visor at the "bottom" (which is up in world space)
-  const visorY = flipped ? y + h - 14 : y + 6;
-  return (
-    <Group opacity={opacity}>
-      <RoundedRect x={x - 2} y={y - 2} width={w + 4} height={h + 4} r={10} color={visorColor} opacity={0.25}>
-        <Blur blur={6} />
-      </RoundedRect>
-      <RoundedRect x={x} y={y} width={w} height={h} r={8} color={color} />
-      <RoundedRect x={x + 3 + (facing > 0 ? 2 : 0)} y={visorY} width={w - 6} height={8} r={3} color={visorColor}>
-        <Blur blur={2} />
-      </RoundedRect>
-      <Rect x={x + 3} y={flipped ? y + 1 : y + h - 3} width={w - 6} height={2} color="#0A0B10" opacity={0.4} />
-    </Group>
-  );
+  return null;
 }
 
 // Keep the compiler happy about the Actor import.
 void ({} as Actor);
+void ActorSprite_LEGACY_UNUSED;
+void PLAYER_H;
+void PLAYER_W;

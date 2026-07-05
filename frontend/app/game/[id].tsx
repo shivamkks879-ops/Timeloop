@@ -48,6 +48,16 @@ export default function GameScreen() {
   const accRef = useRef(0);
   const lastRef = useRef(0);
 
+  // Snapshot of last-tick fields used to detect discrete audio events
+  // (jump/land/portal/key/mid-loop death). Kept in a ref to avoid re-renders.
+  const prevRef = useRef({
+    onGround: true,
+    vy: 0,
+    teleCd: 0,
+    alive: true,
+    keys: 0,
+  });
+
   // Init engine when level changes.
   useEffect(() => {
     if (!level) return;
@@ -55,6 +65,7 @@ export default function GameScreen() {
     setOutcome(null);
     setPaused(false);
     pausedRef.current = false;
+    prevRef.current = { onGround: true, vy: 0, teleCd: 0, alive: true, keys: 0 };
     setFrame((n) => n + 1);
   }, [level?.id]);
 
@@ -84,9 +95,47 @@ export default function GameScreen() {
             controlsRef.current.jump
           );
           stateRef.current = step(s, input);
-          if (stateRef.current.loop > prevLoop) {
+          const cur = stateRef.current;
+
+          // ---- Discrete audio events (edge-triggered) ----
+          const p = prevRef.current;
+          const gDir = cur.player.gravityDir;
+          // Jump: was on ground last tick, now airborne moving against gravity.
+          if (p.onGround && !cur.player.onGround && cur.player.vy * gDir < 0) {
+            playCue("jump");
+          }
+          // Land: was airborne, now on ground.
+          if (!p.onGround && cur.player.onGround) {
+            playCue("land");
+          }
+          // Portal: teleCd goes from 0 → positive means we just teleported.
+          if (p.teleCd === 0 && cur.player.teleCd > 0) {
+            playCue("portal");
+          }
+          // Key pickup: collectedKeys count grew.
+          if (cur.collectedKeys.size > p.keys) {
+            playCue("echo_create");
+          }
+          // Laser mid-loop death (before overall status changes).
+          if (p.alive && !cur.player.alive && cur.status === "playing") {
+            playCue("laser");
+          }
+          prevRef.current = {
+            onGround: cur.player.onGround,
+            vy: cur.player.vy,
+            teleCd: cur.player.teleCd,
+            alive: cur.player.alive,
+            keys: cur.collectedKeys.size,
+          };
+
+          if (cur.loop > prevLoop) {
             playCue("rewind");
             playCue("echo_create");
+            // Reset event tracker for the fresh loop.
+            prevRef.current.onGround = true;
+            prevRef.current.alive = true;
+            prevRef.current.vy = 0;
+            prevRef.current.teleCd = 0;
           }
         }
         setFrame((n) => (n + 1) % 1_000_000);
@@ -132,6 +181,7 @@ export default function GameScreen() {
     stateRef.current = resetLevel(stateRef.current);
     setOutcome(null);
     setPaused(false);
+    prevRef.current = { onGround: true, vy: 0, teleCd: 0, alive: true, keys: 0 };
     setFrame((n) => n + 1);
   };
 
@@ -166,8 +216,8 @@ export default function GameScreen() {
           timeSec={timeSec}
           loop={s?.loop ?? 0}
           maxEchoes={level.maxEchoes}
-          onPause={() => setPaused(true)}
-          onRestart={doRetry}
+          onPause={() => { playCue("ui_tap"); setPaused(true); }}
+          onRestart={() => { playCue("ui_tap"); doRetry(); }}
           levelName={`${level.id} · ${level.name}`}
         />
 
@@ -181,16 +231,16 @@ export default function GameScreen() {
 
       <PauseOverlay
         visible={paused && !outcome}
-        onResume={() => setPaused(false)}
-        onRestart={doRetry}
-        onQuit={doQuit}
+        onResume={() => { playCue("ui_tap"); setPaused(false); }}
+        onRestart={() => { playCue("ui_tap"); doRetry(); }}
+        onQuit={() => { playCue("ui_tap"); doQuit(); }}
       />
       <OutcomeOverlay
         outcome={outcome}
         parEchoes={level.parEchoes}
-        onRetry={doRetry}
-        onNext={doNext}
-        onQuit={doQuit}
+        onRetry={() => { playCue("ui_tap"); doRetry(); }}
+        onNext={() => { playCue("ui_tap"); doNext(); }}
+        onQuit={() => { playCue("ui_tap"); doQuit(); }}
       />
     </View>
   );
