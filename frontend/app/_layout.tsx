@@ -67,9 +67,14 @@ export default function RootLayout() {
         const save = await loadSave();
         await initAudio();
         if (cancelled) return;
-        setSfxEnabled(save.audioOn);
-        setMusicEnabled(save.audioOn);
-        if (save.audioOn) startMusic();
+        // Fine-grained: separate music + SFX toggles override the legacy
+        // master `audioOn`. If a fresh save has both new keys default to
+        // audioOn, older saves fall back to `audioOn`.
+        const sfxOn = save.sfxOn ?? save.audioOn;
+        const musicOn = save.musicOn ?? save.audioOn;
+        setSfxEnabled(sfxOn);
+        setMusicEnabled(musicOn);
+        if (musicOn) startMusic();
         // Mirror the persisted haptics flag into the in-memory helper.
         const { setHapticsEnabled } = await import("@/src/game/haptics");
         setHapticsEnabled(save.hapticsOn);

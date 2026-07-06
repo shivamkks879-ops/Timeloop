@@ -16,6 +16,16 @@ A 2.5D puzzle platformer for mobile (Android-first) where every level lasts 10 s
 * **Phase 5.6** (Touch control polish — haptics, dead-zones, one-thumb mode) — shipped.
 * **Phase 5.7** (VFX/SFX polish — Skia particles, screen shake, layered SFX) — shipped.
 * **Phase 5.8** (Skins + Achievements) — shipped: 6 skin variants + 10 achievements.
+* **Phase 5.9 — Production polish pass** — shipped:
+  - Grid brightness reduced ~30% (backdrop now recedes so gameplay pops)
+  - Spike hazards double-layer red bloom + white inner highlight
+  - Landing dust particles (scales with fall speed, hard landings kick shake)
+  - Player visual scale 1.35× (collision unchanged → all levels still pass)
+  - Button opacity slider (0.4–1.0) + separate Music/SFX toggles
+  - Colorblind-safe palette flag stored in save (renderer swap TBD)
+  - Animated staggered star reveal on outcome screen
+  - Larger, brighter tutorial hint pill
+  - Reorganised Settings screen into Audio / Controls / Visuals / Data sections
 
 ## Phase 5.5–5.8 additions
 * New engine mechanics: `H` boss-locked door — solid until every `B` plate in the level is pressed (persistent across loops).

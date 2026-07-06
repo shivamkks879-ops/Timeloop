@@ -25,9 +25,10 @@ interface Props {
   onChange: (s: ControlState) => void;
   paused?: boolean;
   oneThumb?: boolean;
+  opacity?: number;   // 0.4 – 1.0 (default 0.85). Applied to whole overlay.
 }
 
-export function TouchControls({ onChange, paused, oneThumb }: Props) {
+export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   const stateRef = useRef<ControlState>({ left: false, right: false, jump: false });
   const [_render, setRender] = useState(0);
 
@@ -43,6 +44,7 @@ export function TouchControls({ onChange, paused, oneThumb }: Props) {
   };
 
   const disabled = !!paused;
+  const alpha = typeof opacity === "number" ? Math.max(0.4, Math.min(1, opacity)) : 0.85;
 
   // Enlarged hit-slop = each button reads presses from a much wider area
   // than the visible glyph. This dramatically reduces missed inputs.
@@ -54,7 +56,7 @@ export function TouchControls({ onChange, paused, oneThumb }: Props) {
     // The three buttons are close together so the same thumb can hop
     // between them without lifting off the screen.
     return (
-      <View style={styles.root} pointerEvents={disabled ? "none" : "auto"}>
+      <View style={[styles.root, { opacity: alpha }]} pointerEvents={disabled ? "none" : "auto"}>
         <View style={styles.oneThumbCluster}>
           <Pressable
             testID="btn-left"
@@ -91,7 +93,7 @@ export function TouchControls({ onChange, paused, oneThumb }: Props) {
   }
 
   return (
-    <View style={styles.root} pointerEvents={disabled ? "none" : "auto"}>
+    <View style={[styles.root, { opacity: alpha }]} pointerEvents={disabled ? "none" : "auto"}>
       {/* Left cluster */}
       <View style={styles.leftCluster}>
         <Pressable

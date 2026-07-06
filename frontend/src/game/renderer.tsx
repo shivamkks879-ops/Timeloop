@@ -50,10 +50,15 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         const px = x * SIM.TILE;
         const py = y * SIM.TILE;
         if (t === "#") {
+          // Solid tile — darker fill with a subtle cyan rim (30% dimmer than
+          // before) so the level backdrop reads as background rather than
+          // competing with gameplay elements.
           nodes.push(
             <Group key={`s${x},${y}`}>
-              <RoundedRect x={px + 1} y={py + 1} width={SIM.TILE - 2} height={SIM.TILE - 2} r={3} color="#1B2030" />
-              <RoundedRect x={px + 1} y={py + 1} width={SIM.TILE - 2} height={SIM.TILE - 2} r={3} color={COLORS.cyan} style="stroke" strokeWidth={1} opacity={0.5} />
+              <RoundedRect x={px + 1} y={py + 1} width={SIM.TILE - 2} height={SIM.TILE - 2} r={3} color="#141826" />
+              <RoundedRect x={px + 1} y={py + 1} width={SIM.TILE - 2} height={SIM.TILE - 2} r={3} color={COLORS.cyan} style="stroke" strokeWidth={1} opacity={0.22} />
+              {/* Faint inner highlight so the tile still reads as a solid block. */}
+              <Rect x={px + 3} y={py + 3} width={SIM.TILE - 6} height={2} color={COLORS.cyan} opacity={0.06} />
             </Group>
           );
         } else if (t === "^") {
@@ -64,11 +69,20 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
           path.lineTo(px + (SIM.TILE * 3) / 4, py + SIM.TILE / 2);
           path.lineTo(px + SIM.TILE, py + SIM.TILE);
           path.close();
+          // Amplified danger glow: two-layer red bloom so spikes read
+          // instantly at any zoom level.
           nodes.push(
             <Group key={`sp${x},${y}`}>
+              {/* Outer bloom */}
+              <Path path={path} color={COLORS.red} opacity={0.5}>
+                <Blur blur={7} />
+              </Path>
+              {/* Solid body */}
               <Path path={path} color={COLORS.red} />
+              {/* Sharp inner stroke */}
+              <Path path={path} color="#FFD5DA" style="stroke" strokeWidth={0.6} opacity={0.75} />
               <Path path={path} color={COLORS.red} style="stroke" strokeWidth={1.5}>
-                <Blur blur={2} />
+                <Blur blur={3} />
               </Path>
             </Group>
           );

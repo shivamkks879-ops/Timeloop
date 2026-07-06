@@ -112,11 +112,15 @@ export interface LevelSave {
 export interface SaveData {
   levels: Record<string, LevelSave>;
   removeAds: boolean;
-  audioOn: boolean;
+  audioOn: boolean;         // legacy master audio toggle (kept for back-compat)
+  musicOn: boolean;         // background music enabled
+  sfxOn: boolean;           // sound effects enabled
   hapticsOn: boolean;
   oneThumb: boolean;
   screenShake: boolean;
-  selectedSkin: string;             // id of the selected robot skin
-  unlockedSkins: string[];          // ids of unlocked skin variants
-  achievements: string[];           // ids of unlocked achievements
+  colorSafe: boolean;       // colorblind-safe palette (higher contrast + shapes)
+  controlOpacity: number;   // 0.4 – 1.0, transparency of the on-screen touch pads
+  selectedSkin: string;
+  unlockedSkins: string[];
+  achievements: string[];
 }

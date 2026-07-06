@@ -16,9 +16,13 @@ function emptySave(): SaveData {
     levels,
     removeAds: false,
     audioOn: true,
+    musicOn: true,
+    sfxOn: true,
     hapticsOn: true,
     oneThumb: false,
     screenShake: true,
+    colorSafe: false,
+    controlOpacity: 0.85,
     selectedSkin: "cyan",
     unlockedSkins: ["cyan"],
     achievements: [],
@@ -127,6 +131,26 @@ export async function setOneThumb(on: boolean) {
 export async function setScreenShake(on: boolean) {
   const data = await loadSave();
   data.screenShake = on;
+  await persistSave(data);
+}
+export async function setMusicOn(on: boolean) {
+  const data = await loadSave();
+  data.musicOn = on;
+  await persistSave(data);
+}
+export async function setSfxOn(on: boolean) {
+  const data = await loadSave();
+  data.sfxOn = on;
+  await persistSave(data);
+}
+export async function setColorSafe(on: boolean) {
+  const data = await loadSave();
+  data.colorSafe = on;
+  await persistSave(data);
+}
+export async function setControlOpacity(v: number) {
+  const data = await loadSave();
+  data.controlOpacity = Math.max(0.4, Math.min(1, v));
   await persistSave(data);
 }
 export async function setSelectedSkin(id: string) {

@@ -127,6 +127,29 @@ export default function GameScreen() {
           if (!p.onGround && cur.player.onGround) {
             playCue("land");
             haptic("land");
+            // Landing dust — direction of gravity determines side. Enough
+            // impact velocity → bigger puff (falls trigger louder land).
+            const fallSpeed = Math.abs(p.vy);
+            if (fallSpeed > 1.5) {
+              const feetY = cur.player.gravityDir === 1
+                ? cur.player.y + 28
+                : cur.player.y;
+              const dustCount = fallSpeed > 8 ? 12 : 7;
+              spawnBurst({
+                x: cur.player.x + 11,
+                y: feetY,
+                color: "rgba(210, 220, 240, 0.85)",
+                count: dustCount,
+                speed: 2.0,
+                life: 420,
+                radius: 2,
+                gravity: cur.player.gravityDir === 1 ? -0.05 : 0.05,
+              });
+              // Small screen kick on a hard landing (falls > 8 px/tick).
+              if (fallSpeed > 8) {
+                shakeRef.current = { ticks: 6, peak: 2.5 };
+              }
+            }
           }
           // Portal: teleCd goes from 0 → positive means we just teleported.
           if (p.teleCd === 0 && cur.player.teleCd > 0) {
@@ -333,6 +356,7 @@ export default function GameScreen() {
           onChange={(c) => (controlsRef.current = c)}
           paused={paused || outcome !== null}
           oneThumb={getCachedSave().oneThumb}
+          opacity={getCachedSave().controlOpacity}
         />
 
         <HintOverlay text={level.hint} />
@@ -411,6 +435,27 @@ function OutcomeOverlay({
   onNext: () => void;
   onQuit: () => void;
 }) {
+  // Staggered star reveal — count-up animation.
+  const [starsShown, setStarsShown] = useState(0);
+  useEffect(() => {
+    setStarsShown(0);
+    if (!outcome || outcome.kind !== "won") return;
+    const target = outcome.stars ?? 0;
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 1; i <= target; i++) {
+      timers.push(
+        setTimeout(() => {
+          if (!cancelled) setStarsShown(i);
+        }, 220 * i + 240),
+      );
+    }
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
+  }, [outcome?.kind, outcome?.stars, outcome?.loops]);
+
   if (!outcome) return null;
   const won = outcome.kind === "won";
   return (
@@ -425,14 +470,21 @@ function OutcomeOverlay({
               <View style={styles.gradeRow}>
                 <Text style={styles.gradeLetter}>{outcome.grade}</Text>
                 <View style={styles.starsBig}>
-                  {[0, 1, 2].map((i) => (
-                    <Text
-                      key={i}
-                      style={[styles.starBig, i < (outcome.stars ?? 0) ? styles.starLit : styles.starDim]}
-                    >
-                      {"\u2605"}
-                    </Text>
-                  ))}
+                  {[0, 1, 2].map((i) => {
+                    const lit = i < starsShown;
+                    return (
+                      <Text
+                        key={i}
+                        style={[
+                          styles.starBig,
+                          lit ? styles.starLit : styles.starDim,
+                          { transform: [{ scale: lit ? 1.05 : 0.85 }] },
+                        ]}
+                      >
+                        {"\u2605"}
+                      </Text>
+                    );
+                  })}
                 </View>
               </View>
               <Text style={styles.metaLine}>Echoes used: {outcome.loops} · Par: {parEchoes}</Text>
@@ -471,20 +523,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   hintPill: {
-    backgroundColor: "rgba(10, 11, 16, 0.7)",
+    backgroundColor: "rgba(10, 11, 16, 0.82)",
     borderColor: COLORS.borderGlow,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    maxWidth: "70%",
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    maxWidth: "78%",
   },
   hintText: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
+    color: COLORS.white,
+    fontSize: 14,
     fontWeight: "700",
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     textAlign: "center",
+    lineHeight: 20,
   },
   errText: { color: COLORS.red, padding: 20 },
   overlay: {
