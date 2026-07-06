@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { initAudio, setMusicEnabled, setSfxEnabled, startMusic } from "@/src/game/audio";
 import { loadSave } from "@/src/game/save";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
+import { loadSkiaForPlatform } from "@/src/utils/load-skia-web";
 
 // Silence dev logbox overlays so the game canvas stays clean.
 LogBox.ignoreAllLogs(true);
@@ -30,14 +31,13 @@ export default function RootLayout() {
   }, []);
 
   // Load CanvasKit WASM on web before mounting Skia components.
+  // On native (Android/iOS) `loadSkiaForPlatform` is a no-op stub — the
+  // web-only CanvasKit module is never referenced in the native bundle,
+  // avoiding Metro trying to resolve Node's `fs` inside canvaskit-wasm.
   useEffect(() => {
     if (Platform.OS !== "web") return;
     let cancelled = false;
-    // Dynamic import so native bundles don't try to resolve web-only path.
-    import("@shopify/react-native-skia/lib/module/web")
-      .then((mod) =>
-        mod.LoadSkiaWeb({ locateFile: () => "/canvaskit.wasm" })
-      )
+    loadSkiaForPlatform()
       .then(() => {
         if (!cancelled) setSkiaReady(true);
       })
