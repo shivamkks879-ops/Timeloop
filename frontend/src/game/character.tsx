@@ -225,8 +225,22 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
   // Facing indicator: visor eye tilts toward facing direction.
   const eyeOffset = 1.4 * face;
 
+  // Visual scale — makes the robot render ~30% larger than its collision
+  // box so the character reads well on phone screens without changing
+  // physics. Scaling is applied around the sprite's centre (cx, cy).
+  const VISUAL_SCALE = 1.35;
+
   return (
-    <Group opacity={opacity}>
+    <Group
+      opacity={opacity}
+      transform={[
+        { translateX: cx },
+        { translateY: cy },
+        { scale: VISUAL_SCALE },
+        { translateX: -cx },
+        { translateY: -cy },
+      ]}
+    >
       {/* Ambient glow behind body */}
       <RoundedRect
         x={x - 3}
