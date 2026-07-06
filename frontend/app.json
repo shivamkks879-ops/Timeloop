@@ -51,6 +51,15 @@
       "expo-router",
       "expo-audio",
       [
+        "expo-navigation-bar",
+        {
+          "position": "absolute",
+          "visibility": "hidden",
+          "behavior": "overlay-swipe",
+          "backgroundColor": "#0A0B10"
+        }
+      ],
+      [
         "expo-screen-orientation",
         { "initialOrientation": "LANDSCAPE" }
       ],

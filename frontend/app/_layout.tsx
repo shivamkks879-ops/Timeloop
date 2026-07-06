@@ -2,8 +2,9 @@ import { Stack } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import * as NavigationBar from "expo-navigation-bar";
 import { useEffect, useState } from "react";
-import { LogBox, Platform, View } from "react-native";
+import { AppState, LogBox, Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { initAudio, setMusicEnabled, setSfxEnabled, startMusic } from "@/src/game/audio";
@@ -56,6 +57,28 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded, error, skiaReady]);
+
+  // Force fully-immersive Android navigation bar. On some devices the
+  // `androidNavigationBar` app.json config isn't enough — we need to call the
+  // runtime API too, and re-arm it whenever the app returns to foreground
+  // (Android re-shows the nav bar after any system UI interaction).
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const applyImmersive = async () => {
+      try {
+        await NavigationBar.setVisibilityAsync("hidden");
+        await NavigationBar.setBehaviorAsync("overlay-swipe");
+        await NavigationBar.setBackgroundColorAsync("#0A0B10");
+      } catch {
+        // Older Android or unsupported device — silent noop.
+      }
+    };
+    applyImmersive();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") applyImmersive();
+    });
+    return () => sub.remove();
+  }, []);
 
   // Preload the audio pack once at boot and honour the saved audio preference.
   // Music starts on Android/iOS automatically; on web the browser may block
