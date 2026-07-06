@@ -2,14 +2,17 @@
 //
 // - Standard mode: LEFT/RIGHT on the left thumb zone, JUMP on the right.
 // - One-thumb mode: All three buttons stacked on the LEFT side so the
-//   entire input surface is reachable from a single thumb (great for
-//   commuting / propped-up landscape play).
+//   entire input surface is reachable from a single thumb.
 //
-// Uses onPressIn / onPressOut for zero input delay and reports state up.
-// Dead zones are enlarged via a generous `hitSlop` so users don't miss a
-// button by a pixel — critical for a game where a single frame can matter.
+// Multi-touch:
+//   Each Pressable owns its own touch stream on Android/iOS so the user can
+//   hold LEFT and tap JUMP simultaneously without either losing state. We
+//   deliberately avoid triggering a React re-render of the whole controls
+//   overlay when a button is pressed — Pressable's own `pressed` state
+//   already handles the visual feedback, and forcing a parent re-render was
+//   observed to occasionally cancel a concurrent touch on some devices.
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { COLORS } from "./constants";
@@ -30,18 +33,19 @@ interface Props {
 
 export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   const stateRef = useRef<ControlState>({ left: false, right: false, jump: false });
-  const [_render, setRender] = useState(0);
 
-  const emit = useCallback(() => {
-    onChange({ ...stateRef.current });
-    setRender((n) => (n + 1) % 1_000_000);
-  }, [onChange]);
-
-  const set = (k: keyof ControlState, v: boolean) => {
-    stateRef.current[k] = v;
-    if (v) haptic("ui");
-    emit();
-  };
+  const set = useCallback(
+    (k: keyof ControlState, v: boolean) => {
+      stateRef.current[k] = v;
+      if (v) haptic("ui");
+      // Notify parent — game loop reads this at 60Hz via its own ref.
+      // Intentionally NOT calling any local setState here so this component
+      // never re-renders on button press; that keeps multi-touch streams
+      // isolated on Android and eliminates a wasted 60Hz React reconcile.
+      onChange({ ...stateRef.current });
+    },
+    [onChange],
+  );
 
   const disabled = !!paused;
   const alpha = typeof opacity === "number" ? Math.max(0.4, Math.min(1, opacity)) : 0.85;
@@ -49,14 +53,11 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   // Enlarged hit-slop = each button reads presses from a much wider area
   // than the visible glyph. This dramatically reduces missed inputs.
   const dpadSlop = { top: 22, bottom: 22, left: 22, right: 22 };
-  const jumpSlop = { top: 24, bottom: 24, left: 24, right: 24 };
+  const jumpSlop = { top: 20, bottom: 20, left: 20, right: 20 };
 
   if (oneThumb) {
-    // Single-thumb layout: [LEFT] [JUMP] [RIGHT] stacked on the left edge.
-    // The three buttons are close together so the same thumb can hop
-    // between them without lifting off the screen.
     return (
-      <View style={[styles.root, { opacity: alpha }]} pointerEvents={disabled ? "none" : "auto"}>
+      <View style={[styles.root, { opacity: alpha }]} pointerEvents={disabled ? "none" : "box-none"}>
         <View style={styles.oneThumbCluster}>
           <Pressable
             testID="btn-left"
@@ -72,10 +73,10 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
             testID="btn-jump"
             onPressIn={() => set("jump", true)}
             onPressOut={() => set("jump", false)}
-            style={({ pressed }) => [styles.jumpBtnSmall, pressed && styles.jumpBtnActive]}
+            style={({ pressed }) => [styles.jumpBtn, pressed && styles.jumpBtnActive]}
             hitSlop={jumpSlop}
           >
-            <Text style={styles.jumpLabelSmall}>JUMP</Text>
+            <Text style={styles.jumpLabel}>JUMP</Text>
           </Pressable>
           <View style={{ width: 10 }} />
           <Pressable
@@ -93,7 +94,7 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   }
 
   return (
-    <View style={[styles.root, { opacity: alpha }]} pointerEvents={disabled ? "none" : "auto"}>
+    <View style={[styles.root, { opacity: alpha }]} pointerEvents={disabled ? "none" : "box-none"}>
       {/* Left cluster */}
       <View style={styles.leftCluster}>
         <Pressable
@@ -140,7 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-end",
     paddingHorizontal: 28,
-    paddingBottom: 24,
+    paddingBottom: 22,
   },
   leftCluster: {
     flexDirection: "row",
@@ -155,9 +156,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   padBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     backgroundColor: "rgba(22, 24, 36, 0.75)",
     borderWidth: 1.5,
     borderColor: COLORS.borderGlow,
@@ -170,24 +171,16 @@ const styles = StyleSheet.create({
   },
   padGlyph: {
     color: COLORS.cyan,
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800",
   },
   jumpBtn: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: "rgba(157, 0, 255, 0.18)",
-    borderWidth: 2,
-    borderColor: COLORS.purple,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  jumpBtnSmall: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "rgba(157, 0, 255, 0.18)",
+    // Smaller than before (was 92) — no longer visually dominates the HUD,
+    // still comfortably thumb-sized with generous hitSlop underneath.
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    backgroundColor: "rgba(157, 0, 255, 0.20)",
     borderWidth: 2,
     borderColor: COLORS.purple,
     alignItems: "center",
@@ -197,12 +190,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(157, 0, 255, 0.45)",
   },
   jumpLabel: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: 2,
-  },
-  jumpLabelSmall: {
     color: COLORS.white,
     fontSize: 14,
     fontWeight: "900",

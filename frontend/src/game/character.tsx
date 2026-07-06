@@ -228,7 +228,12 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
   // Visual scale — makes the robot render ~30% larger than its collision
   // box so the character reads well on phone screens without changing
   // physics. Scaling is applied around the sprite's centre (cx, cy).
+  //
+  // Horizontal flip: `face` is +1 (right) or -1 (left). Multiplying scale-X
+  // by `face` flips the whole robot horizontally so it visibly faces the
+  // travel direction — antenna, arm asymmetry, visor eye all flip with it.
   const VISUAL_SCALE = 1.35;
+  const flipX = face >= 0 ? VISUAL_SCALE : -VISUAL_SCALE;
 
   return (
     <Group
@@ -236,7 +241,8 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
       transform={[
         { translateX: cx },
         { translateY: cy },
-        { scale: VISUAL_SCALE },
+        { scaleX: flipX },
+        { scaleY: VISUAL_SCALE },
         { translateX: -cx },
         { translateY: -cy },
       ]}
