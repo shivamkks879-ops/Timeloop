@@ -298,21 +298,51 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
       {/* Head — dome with visor slit */}
       <Circle cx={headCx} cy={headCy} r={headR} color={bodyMain} />
       <Circle cx={headCx} cy={headCy} r={headR} color={visor} style="stroke" strokeWidth={0.8} opacity={0.7} />
-      {/* Visor slit */}
-      <RoundedRect
-        x={headCx - 4 + eyeOffset}
-        y={headCy - 1.2}
-        width={5}
-        height={2.4}
-        r={1}
+
+      {/* --- Side-facing details ------------------------------------------ */}
+      {/* A crescent-shaped visor sweep that heavily favours the FACING side
+          of the head. Together with the eye offset and the jaw bump below,
+          it makes the direction of travel unmistakable at any zoom. */}
+      <Circle
+        cx={headCx + 2.4}
+        cy={headCy}
+        r={headR - 1}
         color={visor}
+        opacity={0.55}
+      />
+      <Circle
+        cx={headCx + 3.5}
+        cy={headCy - 0.6}
+        r={headR - 2.8}
+        color={bodyMain}
+      />
+      {/* Bright visor eye — pushed hard to the front-of-face side. */}
+      <RoundedRect
+        x={headCx + 0.4 + eyeOffset * 2}
+        y={headCy - 1.3}
+        width={5.5}
+        height={2.6}
+        r={1.2}
+        color="#FFFFFF"
+      />
+      <RoundedRect
+        x={headCx + 0.6 + eyeOffset * 2}
+        y={headCy - 1.4}
+        width={5.2}
+        height={2.8}
+        r={1.2}
+        color={visor}
+        opacity={0.9}
       >
         <Blur blur={1.6} />
       </RoundedRect>
-      {/* Antenna */}
-      <Path path={antennaPath} color={visor} style="stroke" strokeWidth={1.2} strokeCap="round" />
-      <Circle cx={antennaTipX} cy={antennaTipY} r={1.6} color={visor}>
-        <Blur blur={1.4} />
+      {/* Jaw bump — a small chin nudge on the facing side. */}
+      <Circle cx={headCx + headR * 0.55} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.85} />
+
+      {/* Antenna — leans forward toward the facing direction. */}
+      <Path path={antennaPath} color={visor} style="stroke" strokeWidth={1.4} strokeCap="round" />
+      <Circle cx={antennaTipX} cy={antennaTipY} r={1.8} color={visor}>
+        <Blur blur={1.6} />
       </Circle>
 
       {/* Thruster when jumping */}

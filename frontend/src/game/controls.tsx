@@ -1,19 +1,24 @@
 // Touch controls for landscape play.
 //
-// - Standard mode: LEFT/RIGHT on the left thumb zone, JUMP on the right.
-// - One-thumb mode: All three buttons stacked on the LEFT side so the
-//   entire input surface is reachable from a single thumb.
+// MULTI-TOUCH:
+//   Uses `react-native-gesture-handler`'s `Gesture.LongPress` (with a zero
+//   minimum duration and effectively infinite maxDistance) for each button.
+//   RNGH dispatches touches at the *native* Android/iOS level BEFORE React
+//   Native's synthetic responder system runs, and each `GestureDetector`
+//   owns its own pointer stream. This guarantees LEFT + JUMP (or RIGHT +
+//   JUMP) can be pressed simultaneously — which the plain `Pressable`
+//   sometimes fails to deliver on certain Android touch layers.
 //
-// Multi-touch:
-//   Each Pressable owns its own touch stream on Android/iOS so the user can
-//   hold LEFT and tap JUMP simultaneously without either losing state. We
-//   deliberately avoid triggering a React re-render of the whole controls
-//   overlay when a button is pressed — Pressable's own `pressed` state
-//   already handles the visual feedback, and forcing a parent re-render was
-//   observed to occasionally cancel a concurrent touch on some devices.
+// LAYOUTS:
+//   • Standard mode: LEFT/RIGHT bottom-left, JUMP bottom-right.
+//   • One-thumb mode: All three buttons stacked on the LEFT side.
+//
+// UX niceties: enlarged hit-slop (bigger effective touch area than the
+// visible glyph), lighter jump button, cyan/purple neon accents, dark base.
 
-import React, { useCallback, useRef } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useRef, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import { COLORS } from "./constants";
 import { haptic } from "./haptics";
@@ -31,6 +36,64 @@ interface Props {
   opacity?: number;   // 0.4 – 1.0 (default 0.85). Applied to whole overlay.
 }
 
+/**
+ * Single button that reports press-in / press-out via a LongPress gesture
+ * (min duration 0). Renders its own pressed state so we don't need to
+ * re-render the parent controls on every touch event.
+ */
+function GameButton({
+  testID,
+  onPress,
+  onRelease,
+  disabled,
+  slop,
+  containerStyle,
+  activeStyle,
+  children,
+}: {
+  testID: string;
+  onPress: () => void;
+  onRelease: () => void;
+  disabled?: boolean;
+  slop: number;
+  containerStyle: any;
+  activeStyle: any;
+  children: React.ReactNode;
+}) {
+  const [pressed, setPressed] = useState(false);
+  // `runOnJS` is unnecessary here — LongPress's callbacks are already on the
+  // JS thread when the gesture is built without a worklet-mode explicit flag.
+  const gesture = React.useMemo(
+    () =>
+      Gesture.LongPress()
+        .minDuration(0)              // fire on touch-down, not after a delay
+        .maxDistance(10_000)         // never cancel on slight finger drift
+        .shouldCancelWhenOutside(false)
+        .enabled(!disabled)
+        .onBegin(() => {
+          setPressed(true);
+          onPress();
+        })
+        .onFinalize(() => {
+          setPressed(false);
+          onRelease();
+        }),
+    [disabled, onPress, onRelease],
+  );
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <View
+        testID={testID}
+        hitSlop={slop}
+        style={[containerStyle, pressed && activeStyle]}
+      >
+        {children}
+      </View>
+    </GestureDetector>
+  );
+}
+
 export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   const stateRef = useRef<ControlState>({ left: false, right: false, jump: false });
 
@@ -38,10 +101,6 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
     (k: keyof ControlState, v: boolean) => {
       stateRef.current[k] = v;
       if (v) haptic("ui");
-      // Notify parent — game loop reads this at 60Hz via its own ref.
-      // Intentionally NOT calling any local setState here so this component
-      // never re-renders on button press; that keeps multi-touch streams
-      // isolated on Android and eliminates a wasted 60Hz React reconcile.
       onChange({ ...stateRef.current });
     },
     [onChange],
@@ -50,85 +109,98 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   const disabled = !!paused;
   const alpha = typeof opacity === "number" ? Math.max(0.4, Math.min(1, opacity)) : 0.85;
 
-  // Enlarged hit-slop = each button reads presses from a much wider area
-  // than the visible glyph. This dramatically reduces missed inputs.
-  const dpadSlop = { top: 22, bottom: 22, left: 22, right: 22 };
-  const jumpSlop = { top: 20, bottom: 20, left: 20, right: 20 };
+  // Callbacks are stable — GameButton memoises on identity.
+  const leftDown = useCallback(() => set("left", true), [set]);
+  const leftUp = useCallback(() => set("left", false), [set]);
+  const rightDown = useCallback(() => set("right", true), [set]);
+  const rightUp = useCallback(() => set("right", false), [set]);
+  const jumpDown = useCallback(() => set("jump", true), [set]);
+  const jumpUp = useCallback(() => set("jump", false), [set]);
 
   if (oneThumb) {
     return (
-      <View style={[styles.root, { opacity: alpha }]} pointerEvents={disabled ? "none" : "box-none"}>
+      <View style={[styles.root, { opacity: alpha }]} pointerEvents="box-none">
         <View style={styles.oneThumbCluster}>
-          <Pressable
+          <GameButton
             testID="btn-left"
-            onPressIn={() => set("left", true)}
-            onPressOut={() => set("left", false)}
-            style={({ pressed }) => [styles.padBtn, pressed && styles.padBtnActive]}
-            hitSlop={dpadSlop}
+            onPress={leftDown}
+            onRelease={leftUp}
+            disabled={disabled}
+            slop={22}
+            containerStyle={styles.padBtn}
+            activeStyle={styles.padBtnActive}
           >
             <Text style={styles.padGlyph}>{"\u25C0"}</Text>
-          </Pressable>
+          </GameButton>
           <View style={{ width: 10 }} />
-          <Pressable
+          <GameButton
             testID="btn-jump"
-            onPressIn={() => set("jump", true)}
-            onPressOut={() => set("jump", false)}
-            style={({ pressed }) => [styles.jumpBtn, pressed && styles.jumpBtnActive]}
-            hitSlop={jumpSlop}
+            onPress={jumpDown}
+            onRelease={jumpUp}
+            disabled={disabled}
+            slop={20}
+            containerStyle={styles.jumpBtn}
+            activeStyle={styles.jumpBtnActive}
           >
             <Text style={styles.jumpLabel}>JUMP</Text>
-          </Pressable>
+          </GameButton>
           <View style={{ width: 10 }} />
-          <Pressable
+          <GameButton
             testID="btn-right"
-            onPressIn={() => set("right", true)}
-            onPressOut={() => set("right", false)}
-            style={({ pressed }) => [styles.padBtn, pressed && styles.padBtnActive]}
-            hitSlop={dpadSlop}
+            onPress={rightDown}
+            onRelease={rightUp}
+            disabled={disabled}
+            slop={22}
+            containerStyle={styles.padBtn}
+            activeStyle={styles.padBtnActive}
           >
             <Text style={styles.padGlyph}>{"\u25B6"}</Text>
-          </Pressable>
+          </GameButton>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.root, { opacity: alpha }]} pointerEvents={disabled ? "none" : "box-none"}>
-      {/* Left cluster */}
+    <View style={[styles.root, { opacity: alpha }]} pointerEvents="box-none">
       <View style={styles.leftCluster}>
-        <Pressable
+        <GameButton
           testID="btn-left"
-          onPressIn={() => set("left", true)}
-          onPressOut={() => set("left", false)}
-          style={({ pressed }) => [styles.padBtn, pressed && styles.padBtnActive]}
-          hitSlop={dpadSlop}
+          onPress={leftDown}
+          onRelease={leftUp}
+          disabled={disabled}
+          slop={22}
+          containerStyle={styles.padBtn}
+          activeStyle={styles.padBtnActive}
         >
           <Text style={styles.padGlyph}>{"\u25C0"}</Text>
-        </Pressable>
+        </GameButton>
         <View style={{ width: 18 }} />
-        <Pressable
+        <GameButton
           testID="btn-right"
-          onPressIn={() => set("right", true)}
-          onPressOut={() => set("right", false)}
-          style={({ pressed }) => [styles.padBtn, pressed && styles.padBtnActive]}
-          hitSlop={dpadSlop}
+          onPress={rightDown}
+          onRelease={rightUp}
+          disabled={disabled}
+          slop={22}
+          containerStyle={styles.padBtn}
+          activeStyle={styles.padBtnActive}
         >
           <Text style={styles.padGlyph}>{"\u25B6"}</Text>
-        </Pressable>
+        </GameButton>
       </View>
 
-      {/* Right cluster - Jump */}
       <View style={styles.rightCluster}>
-        <Pressable
+        <GameButton
           testID="btn-jump"
-          onPressIn={() => set("jump", true)}
-          onPressOut={() => set("jump", false)}
-          style={({ pressed }) => [styles.jumpBtn, pressed && styles.jumpBtnActive]}
-          hitSlop={jumpSlop}
+          onPress={jumpDown}
+          onRelease={jumpUp}
+          disabled={disabled}
+          slop={20}
+          containerStyle={styles.jumpBtn}
+          activeStyle={styles.jumpBtnActive}
         >
           <Text style={styles.jumpLabel}>JUMP</Text>
-        </Pressable>
+        </GameButton>
       </View>
     </View>
   );
@@ -175,8 +247,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   jumpBtn: {
-    // Smaller than before (was 92) — no longer visually dominates the HUD,
-    // still comfortably thumb-sized with generous hitSlop underneath.
     width: 74,
     height: 74,
     borderRadius: 37,

@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
 import { useEffect, useState } from "react";
 import { AppState, LogBox, Platform, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { initAudio, setMusicEnabled, setSfxEnabled, startMusic } from "@/src/game/audio";
@@ -114,20 +115,22 @@ export default function RootLayout() {
   if ((!loaded && !error) || !skiaReady) return null;
 
   return (
-    <SafeAreaProvider>
-      {/* Immersive fullscreen: pitch-black backdrop covers the whole window
-          (including any display cutouts / notches / gesture zones) so the
-          game canvas never bleeds into a white system area. */}
-      <View style={{ flex: 1, backgroundColor: "#0A0B10" }}>
-        <StatusBar hidden style="light" translucent backgroundColor="transparent" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: "#0A0B10" },
-            animation: "fade",
-          }}
-        />
-      </View>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#0A0B10" }}>
+      <SafeAreaProvider>
+        {/* Immersive fullscreen: pitch-black backdrop covers the whole window
+            (including any display cutouts / notches / gesture zones) so the
+            game canvas never bleeds into a white system area. */}
+        <View style={{ flex: 1, backgroundColor: "#0A0B10" }}>
+          <StatusBar hidden style="light" translucent backgroundColor="transparent" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: "#0A0B10" },
+              animation: "fade",
+            }}
+          />
+        </View>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
