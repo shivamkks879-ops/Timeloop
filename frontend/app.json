@@ -8,10 +8,29 @@
     "scheme": "timeloopescape",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "backgroundColor": "#0A0B10",
+    "androidStatusBar": {
+      "hidden": true,
+      "translucent": true,
+      "backgroundColor": "#0A0B10",
+      "barStyle": "light-content"
+    },
+    "androidNavigationBar": {
+      "visible": "immersive",
+      "barStyle": "light-content",
+      "backgroundColor": "#0A0B10"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.timeloopescape.cab57c",
-      "requireFullScreen": true
+      "requireFullScreen": true,
+      "userInterfaceStyle": "dark",
+      "infoPlist": {
+        "UIRequiresFullScreen": true,
+        "UIStatusBarHidden": true,
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "UIViewControllerBasedStatusBarAppearance": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,12 +38,14 @@
         "backgroundColor": "#0A0B10"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.timeloopescape.cab57c"
+      "package": "com.emergent.timeloopescape.cab57c",
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "backgroundColor": "#0A0B10"
     },
     "plugins": [
       "expo-router",
@@ -37,10 +58,18 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-image.png",
-          "imageWidth": 200,
+          "imageWidth": 340,
           "resizeMode": "contain",
-          "backgroundColor": "#0A0B10"
+          "backgroundColor": "#0A0B10",
+          "dark": {
+            "image": "./assets/images/splash-image.png",
+            "backgroundColor": "#0A0B10"
+          }
         }
+      ],
+      [
+        "expo-system-ui",
+        { "userInterfaceStyle": "dark" }
       ]
     ],
     "experiments": {

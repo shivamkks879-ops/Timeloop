@@ -1,8 +1,9 @@
 import { Stack } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { LogBox, Platform } from "react-native";
+import { LogBox, Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { initAudio, setMusicEnabled, setSfxEnabled, startMusic } from "@/src/game/audio";
@@ -91,13 +92,19 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: "#0A0B10" },
-          animation: "fade",
-        }}
-      />
+      {/* Immersive fullscreen: pitch-black backdrop covers the whole window
+          (including any display cutouts / notches / gesture zones) so the
+          game canvas never bleeds into a white system area. */}
+      <View style={{ flex: 1, backgroundColor: "#0A0B10" }}>
+        <StatusBar hidden style="light" translucent backgroundColor="transparent" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: "#0A0B10" },
+            animation: "fade",
+          }}
+        />
+      </View>
     </SafeAreaProvider>
   );
 }

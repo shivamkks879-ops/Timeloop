@@ -328,9 +328,12 @@ export default function GameScreen() {
 
   return (
     <View style={styles.root}>
-      <SafeAreaView
-        style={styles.safe}
-        edges={["top", "bottom", "left", "right"]}
+      {/* Game view extends *behind* the safe area so the canvas fills every
+          pixel edge-to-edge on notched / cutout displays. Interactive UI
+          (HUD, controls, overlays) still respects the safe insets so they
+          never end up under a notch. */}
+      <View
+        style={{ flex: 1 }}
         onLayout={(e) =>
           setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
         }
@@ -342,6 +345,9 @@ export default function GameScreen() {
             </Suspense>
           </View>
         ) : null}
+        {/* Interactive layer (HUD + touch controls + hint) is inset by the
+            safe area so buttons don't hide under system UI. */}
+        <SafeAreaView style={StyleSheet.absoluteFill} edges={["top", "bottom", "left", "right"]} pointerEvents="box-none">
 
         <HUD
           timeSec={timeSec}
@@ -360,7 +366,8 @@ export default function GameScreen() {
         />
 
         <HintOverlay text={level.hint} />
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
 
       <PauseOverlay
         visible={paused && !outcome}
