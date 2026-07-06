@@ -123,4 +123,12 @@ export interface SaveData {
   selectedSkin: string;
   unlockedSkins: string[];
   achievements: string[];
+  // ---------- lifetime stats ----------
+  stats: {
+    totalDeaths: number;
+    totalEchoes: number;
+    totalPlaytimeMs: number;
+    totalLevelsCompleted: number;
+    fastestClearMs: number | null;     // best single-level clear time
+  };
 }

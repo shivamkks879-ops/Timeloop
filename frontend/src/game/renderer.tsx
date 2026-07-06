@@ -351,16 +351,37 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
 
   return (
     <Canvas style={{ width, height }}>
+      {/* Deep-space gradient — the reference point of the whole aesthetic. */}
       <Rect x={0} y={0} width={width} height={height}>
         <LinearGradient start={vec(0, 0)} end={vec(0, height)} colors={["#0A0B10", "#12142A"]} />
       </Rect>
+
+      {/* Animated star field — three parallax layers of stars drifting slowly
+          across the screen. Purely visual, GPU-cheap (just circles). Each
+          star's position wraps around the viewport so the field is
+          seamless. Rendered BEFORE the world so it feels like a backdrop. */}
+      <BackgroundStars width={width} height={height} frame={animFrame} />
+
+      {/* Nebula tint — a soft purple wash that slowly shifts opacity so
+          the background has a living, breathing quality. */}
+      <Rect
+        x={0}
+        y={0}
+        width={width}
+        height={height}
+        color="#3A1560"
+        opacity={0.07 + 0.03 * Math.sin(animFrame / 240)}
+      >
+        <Blur blur={40} />
+      </Rect>
+
       {timeLow ? (
         <Rect x={0} y={0} width={width} height={height} color={COLORS.red} opacity={0.08} />
       ) : null}
 
       <Group transform={[{ translateX: offX }, { translateY: offY }, { scale }]}>
-        <Rect x={0} y={0} width={worldW} height={worldH} color="#0E1120" />
-        <Rect x={0} y={0} width={worldW} height={worldH} color={COLORS.cyan} opacity={0.03} />
+        <Rect x={0} y={0} width={worldW} height={worldH} color="#0E1120" opacity={0.55} />
+        <Rect x={0} y={0} width={worldW} height={worldH} color={COLORS.cyan} opacity={0.02} />
         {tileNodes}
         {platformNodes}
         {sentryNodes}
@@ -370,6 +391,57 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         {particleNodes}
       </Group>
     </Canvas>
+  );
+}
+
+/**
+ * A tiny 3-layer parallax star field. Each layer holds ~30 stars with a
+ * different drift speed and depth. Star positions are seeded deterministically
+ * so the field looks the same every run (matches the deterministic game feel).
+ */
+function BackgroundStars({ width, height, frame }: { width: number; height: number; frame: number }) {
+  const stars = React.useMemo(() => {
+    const out: { x: number; y: number; r: number; speed: number; alpha: number; hue: string }[] = [];
+    // simple LCG for stable seeded positions
+    let seed = 987654321;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed / 4294967296;
+    };
+    for (let i = 0; i < 90; i++) {
+      const depth = rand();
+      out.push({
+        x: rand() * width * 1.4,
+        y: rand() * height,
+        r: 0.6 + rand() * 1.8 * (1 - depth * 0.5),
+        speed: 0.15 + depth * 0.9,
+        alpha: 0.25 + rand() * 0.6 * (1 - depth * 0.4),
+        hue: rand() < 0.15 ? "#B266FF" : rand() < 0.35 ? "#00E5FF" : "#FFFFFF",
+      });
+    }
+    return out;
+  }, [width, height]);
+
+  return (
+    <Group>
+      {stars.map((s, i) => {
+        // Drift left over time; wrap around the right edge.
+        const x = (s.x - frame * s.speed) % (width + 20);
+        const wrappedX = x < -10 ? x + width + 20 : x;
+        // Twinkle: gentle sine on alpha
+        const twinkle = 0.65 + 0.35 * Math.sin(frame / 30 + i);
+        return (
+          <Circle
+            key={i}
+            cx={wrappedX}
+            cy={s.y}
+            r={s.r}
+            color={s.hue}
+            opacity={s.alpha * twinkle}
+          />
+        );
+      })}
+    </Group>
   );
 }
 

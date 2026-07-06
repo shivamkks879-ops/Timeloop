@@ -20,7 +20,7 @@ import {
 } from "@/src/game/engine";
 import { HUD } from "@/src/game/hud";
 import { getLevel, nextLevelId } from "@/src/game/levels";
-import { getCachedSave, recordLevelResult } from "@/src/game/save";
+import { bumpDeathStat, bumpPlaytime, getCachedSave, recordLevelResult } from "@/src/game/save";
 import { playCue } from "@/src/game/audio";
 import { haptic } from "@/src/game/haptics";
 import { spawnBurst } from "@/src/game/particles";
@@ -50,6 +50,8 @@ export default function GameScreen() {
   const accRef = useRef(0);
   // Screen shake driver: number of ticks of shake remaining + peak intensity.
   const shakeRef = useRef<{ ticks: number; peak: number }>({ ticks: 0, peak: 0 });
+  // Level-start timestamp for stats (fastest clear + playtime accumulation).
+  const levelStartRef = useRef<number>(Date.now());
   const lastRef = useRef(0);
 
   // Snapshot of last-tick fields used to detect discrete audio events
@@ -70,6 +72,7 @@ export default function GameScreen() {
     setPaused(false);
     pausedRef.current = false;
     prevRef.current = { onGround: true, vy: 0, teleCd: 0, alive: true, keys: 0 };
+    levelStartRef.current = Date.now();
     setFrame((n) => n + 1);
   }, [level?.id]);
 
@@ -238,8 +241,10 @@ export default function GameScreen() {
         if (s && s.status === "won" && !outcome) {
           const grade = computeGrade(s.level, s.loop);
           const stars = gradeToStars(grade);
+          const clearMs = Date.now() - levelStartRef.current;
           setOutcome({ kind: "won", loops: s.loop, grade, stars });
-          recordLevelResult(s.level.id, s.loop, grade, stars).catch(() => {});
+          recordLevelResult(s.level.id, s.loop, grade, stars, clearMs).catch(() => {});
+          bumpPlaytime(clearMs).catch(() => {});
           playCue("win");
           haptic("win");
           // Confetti-ish victory burst at the player's location.
@@ -265,10 +270,13 @@ export default function GameScreen() {
           });
         }
         if (s && s.status === "dead" && !outcome) {
+          const playedMs = Date.now() - levelStartRef.current;
           setOutcome({ kind: "dead", loops: s.loop });
           playCue("die");
           haptic("death");
           shakeRef.current = { ticks: 24, peak: 10 };
+          bumpDeathStat().catch(() => {});
+          bumpPlaytime(playedMs).catch(() => {});
         }
       }
       rafRef.current = requestAnimationFrame(loop);

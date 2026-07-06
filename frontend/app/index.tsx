@@ -73,6 +73,13 @@ export default function MainMenu() {
               <Text style={styles.secondaryLabel}>ACHIEVEMENTS</Text>
             </Pressable>
             <Pressable
+              testID="btn-stats"
+              onPress={() => router.push("/stats" as any)}
+              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
+            >
+              <Text style={styles.secondaryLabel}>STATISTICS</Text>
+            </Pressable>
+            <Pressable
               testID="btn-settings"
               onPress={() => router.push("/settings" as any)}
               style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
@@ -128,39 +135,39 @@ const styles = StyleSheet.create({
   },
   actions: {
     minWidth: 280,
-    gap: 12,
+    gap: 8,
   },
   primaryBtn: {
     backgroundColor: "rgba(0, 229, 255, 0.15)",
     borderColor: COLORS.cyan,
     borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 22,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
   },
   primaryLabel: {
     color: COLORS.white,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "900",
     letterSpacing: 4,
   },
   primarySub: {
     color: COLORS.textSecondary,
-    marginTop: 4,
-    fontSize: 12,
+    marginTop: 2,
+    fontSize: 11,
     letterSpacing: 1,
   },
   secondaryBtn: {
     backgroundColor: "rgba(22, 24, 36, 0.85)",
     borderColor: COLORS.borderGlow,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 22,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
   },
   secondaryLabel: {
     color: COLORS.white,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "800",
     letterSpacing: 3,
   },

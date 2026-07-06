@@ -26,6 +26,13 @@ function emptySave(): SaveData {
     selectedSkin: "cyan",
     unlockedSkins: ["cyan"],
     achievements: [],
+    stats: {
+      totalDeaths: 0,
+      totalEchoes: 0,
+      totalPlaytimeMs: 0,
+      totalLevelsCompleted: 0,
+      fastestClearMs: null,
+    },
   };
 }
 
@@ -41,12 +48,14 @@ export async function loadSave(): Promise<SaveData> {
   }
   try {
     const parsed = JSON.parse(raw) as SaveData;
-    // Merge with empty save to backfill any new levels
+    // Merge with empty save to backfill any new levels / new top-level keys
+    // added between versions (e.g. `stats` for older saves).
     const base = emptySave();
     cache = {
       ...base,
       ...parsed,
       levels: { ...base.levels, ...parsed.levels },
+      stats: { ...base.stats, ...(parsed.stats ?? {}) },
     };
     return cache;
   } catch {
@@ -68,7 +77,8 @@ export async function recordLevelResult(
   levelId: string,
   echoesUsed: number,
   grade: "S" | "A" | "B" | "C",
-  stars: number
+  stars: number,
+  clearMs?: number,
 ): Promise<SaveData> {
   const data = await loadSave();
   const prev = data.levels[levelId] ?? {
@@ -78,12 +88,21 @@ export async function recordLevelResult(
     stars: 0,
   };
   const better = !prev.completed || stars > prev.stars || echoesUsed < prev.bestEchoes;
+  const wasCompleted = prev.completed;
   data.levels[levelId] = {
     completed: true,
     bestEchoes: Math.min(prev.bestEchoes, echoesUsed),
     grade: better ? grade : prev.grade,
     stars: Math.max(prev.stars, stars),
   };
+  // Lifetime stats: bump counters even on repeat clears.
+  data.stats.totalEchoes += echoesUsed;
+  if (!wasCompleted) data.stats.totalLevelsCompleted += 1;
+  if (typeof clearMs === "number" && clearMs > 0) {
+    if (data.stats.fastestClearMs === null || clearMs < data.stats.fastestClearMs) {
+      data.stats.fastestClearMs = clearMs;
+    }
+  }
   // Auto-unlock any newly-earned skins and achievements based on updated
   // progress. Both lookups are pure functions of the save data.
   const { unlockedByProgress } = await import("./skins");
@@ -98,6 +117,19 @@ export async function recordLevelResult(
   }
   await persistSave(data);
   return data;
+}
+
+export async function bumpDeathStat() {
+  const data = await loadSave();
+  data.stats.totalDeaths += 1;
+  await persistSave(data);
+}
+
+export async function bumpPlaytime(ms: number) {
+  if (!ms || ms <= 0) return;
+  const data = await loadSave();
+  data.stats.totalPlaytimeMs += ms;
+  await persistSave(data);
 }
 
 export function isLevelUnlocked(data: SaveData, levelId: string): boolean {
