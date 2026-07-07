@@ -24,6 +24,31 @@ PURPLE_SOFT = (157, 0, 255, 90)
 WHITE = (255, 255, 255, 255)
 
 
+# Font paths (try in order — first that exists is used).
+FONT_BOLD_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+]
+FONT_REG_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+]
+
+
+def _load_font(size, bold=True):
+    import os as _os
+    candidates = FONT_BOLD_CANDIDATES if bold else FONT_REG_CANDIDATES
+    for path in candidates:
+        if _os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+
 # ---------- helpers ----------
 
 def make_bg(size, radial=True):
@@ -133,14 +158,7 @@ def add_wordmark(img, text, y_frac=0.86, size_frac=0.06):
     """Overlay a small letter-spaced wordmark near the bottom of the icon."""
     size = img.size[0]
     d = ImageDraw.Draw(img)
-    # Try a bundled font, fall back to default.
-    try:
-        font = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            int(size * size_frac),
-        )
-    except Exception:
-        font = ImageFont.load_default()
+    font = _load_font(int(size * size_frac), bold=True)
     tw = d.textlength(text, font=font)
     d.text(
         ((size - tw) / 2, size * y_frac),
@@ -182,17 +200,8 @@ def make_splash():
     gx = (size - glyph.size[0]) // 2
     gy = int(size * 0.20)
     img.alpha_composite(glyph, (gx, gy))
-    # wordmark
-    try:
-        font_big = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 80
-        )
-        font_small = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 34
-        )
-    except Exception:
-        font_big = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    font_big = _load_font(80, bold=True)
+    font_small = _load_font(34, bold=True)
     d = ImageDraw.Draw(img)
     tw = d.textlength("TIME LOOP", font=font_big)
     d.text(((size - tw) / 2, int(size * 0.80)), "TIME LOOP",
@@ -210,12 +219,122 @@ def make_favicon():
     return make_icon().resize((48, 48), Image.LANCZOS)
 
 
+def make_feature_graphic():
+    """Play Store Feature Graphic (1024 × 500). Landscape hero banner
+    showing the loop glyph on the left and the wordmark + tagline on the
+    right, all on the signature deep-space gradient with a scattering of
+    stars for depth."""
+    W, H = 1024, 500
+
+    # Background — horizontal gradient dark-purple → dark-blue.
+    img = Image.new("RGBA", (W, H), (10, 11, 16, 255))
+    px = img.load()
+    for x in range(W):
+        t = x / W
+        r = int(10 + 20 * t)
+        g = int(11 + 15 * t)
+        b = int(16 + 55 * t)
+        for y in range(H):
+            # subtle vertical falloff
+            fy = 1 - abs((y / H) - 0.5) * 0.3
+            px[x, y] = (int(r * fy), int(g * fy), int(b * fy), 255)
+
+    # Star field
+    import random
+    random.seed(42)
+    d = ImageDraw.Draw(img)
+    for _ in range(140):
+        sx = random.randint(0, W - 1)
+        sy = random.randint(0, H - 1)
+        rr = random.uniform(0.6, 2.2)
+        a = int(random.uniform(90, 220))
+        hue = random.choice([(255, 255, 255), (0, 229, 255), (178, 102, 255)])
+        d.ellipse([sx - rr, sy - rr, sx + rr, sy + rr], fill=(*hue, a))
+
+    # Loop glyph on the left (transparent overlay so it composites over the bg)
+    glyph_size = 380
+    glyph = draw_loop_glyph(glyph_size, transparent_bg=True, glow_boost=1.3)
+    gx = 60
+    gy = (H - glyph_size) // 2
+    img.alpha_composite(glyph, (gx, gy))
+
+    # Right-side wordmark + tagline
+    font_big = _load_font(76, bold=True)
+    font_med = _load_font(76, bold=True)
+    font_small = _load_font(22, bold=True)
+    font_tiny = _load_font(18, bold=False)
+
+    tx = 500
+    d.text((tx, 130), "TIME LOOP", font=font_big, fill=(255, 255, 255, 240))
+    d.text((tx, 210), "ESCAPE", font=font_med, fill=CYAN)
+    d.text(
+        (tx, 305),
+        "8 WORLDS · 100 PUZZLES",
+        font=font_small,
+        fill=(180, 190, 210, 230),
+    )
+    d.text(
+        (tx, 340),
+        "Rewind time. Cooperate with your echoes.",
+        font=font_tiny,
+        fill=(140, 150, 180, 230),
+    )
+    d.text(
+        (tx, 365),
+        "A neon puzzle platformer.",
+        font=font_tiny,
+        fill=(140, 150, 180, 230),
+    )
+
+    # Cyan accent bar bottom-left
+    d.rectangle([0, H - 4, W, H], fill=CYAN)
+
+    return img
+
+
+def make_promo_banner():
+    """Compact promotional banner (1200 × 300) — same treatment but wider."""
+    W, H = 1200, 300
+    img = Image.new("RGBA", (W, H), (10, 11, 16, 255))
+    px = img.load()
+    for x in range(W):
+        t = x / W
+        r = int(10 + 22 * t)
+        g = int(11 + 16 * t)
+        b = int(16 + 60 * t)
+        for y in range(H):
+            fy = 1 - abs((y / H) - 0.5) * 0.3
+            px[x, y] = (int(r * fy), int(g * fy), int(b * fy), 255)
+    import random
+    random.seed(84)
+    d = ImageDraw.Draw(img)
+    for _ in range(80):
+        sx = random.randint(0, W - 1)
+        sy = random.randint(0, H - 1)
+        rr = random.uniform(0.6, 2.0)
+        a = int(random.uniform(90, 220))
+        hue = random.choice([(255, 255, 255), (0, 229, 255), (178, 102, 255)])
+        d.ellipse([sx - rr, sy - rr, sx + rr, sy + rr], fill=(*hue, a))
+    gs = 220
+    glyph = draw_loop_glyph(gs, transparent_bg=True, glow_boost=1.2)
+    img.alpha_composite(glyph, (40, (H - gs) // 2))
+    big = _load_font(60, bold=True)
+    sml = _load_font(20, bold=False)
+    d.text((320, 80), "TIME LOOP ESCAPE", font=big, fill=(255, 255, 255, 240))
+    d.text((320, 155), "REWIND. COOPERATE. ESCAPE.", font=sml, fill=CYAN)
+    d.text((320, 190), "8 worlds · 100 handcrafted puzzles", font=sml, fill=(150, 160, 190, 220))
+    d.rectangle([0, H - 3, W, H], fill=CYAN)
+    return img
+
+
 # ---------- main ----------
 
 if __name__ == "__main__":
     import os
     out_dir = "/app/frontend/assets/images"
+    store_dir = "/app/frontend/store"
     os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(store_dir, exist_ok=True)
 
     print("Generating icon.png…")
     make_icon().save(f"{out_dir}/icon.png", "PNG", optimize=True)
@@ -225,4 +344,13 @@ if __name__ == "__main__":
     make_splash().save(f"{out_dir}/splash-image.png", "PNG", optimize=True)
     print("Generating favicon.png…")
     make_favicon().save(f"{out_dir}/favicon.png", "PNG", optimize=True)
+    print("Generating feature-graphic.png (Play Store 1024x500)…")
+    make_feature_graphic().save(f"{store_dir}/feature-graphic.png", "PNG", optimize=True)
+    print("Generating promo-banner.png (1200x300)…")
+    make_promo_banner().save(f"{store_dir}/promo-banner.png", "PNG", optimize=True)
+    # Also emit a 512x512 icon variant for Play Store listing.
+    print("Generating icon-512.png (Play Store)…")
+    make_icon().resize((512, 512), Image.LANCZOS).save(
+        f"{store_dir}/icon-512.png", "PNG", optimize=True
+    )
     print("Done.")
