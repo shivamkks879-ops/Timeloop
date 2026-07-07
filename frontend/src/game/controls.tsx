@@ -1,24 +1,23 @@
 // Touch controls for landscape play.
 //
-// MULTI-TOUCH:
-//   Uses `react-native-gesture-handler`'s `Gesture.LongPress` (with a zero
-//   minimum duration and effectively infinite maxDistance) for each button.
-//   RNGH dispatches touches at the *native* Android/iOS level BEFORE React
-//   Native's synthetic responder system runs, and each `GestureDetector`
-//   owns its own pointer stream. This guarantees LEFT + JUMP (or RIGHT +
-//   JUMP) can be pressed simultaneously — which the plain `Pressable`
-//   sometimes fails to deliver on certain Android touch layers.
+// MULTI-TOUCH implementation:
+//   We deliberately avoid `Pressable` and `react-native-gesture-handler`
+//   here. Each button is a plain `<View>` with native `onTouchStart` /
+//   `onTouchEnd` / `onTouchCancel` handlers. Android dispatches touch
+//   events at the *native* level to whichever View is under a finger —
+//   independently for every active pointer — so pressing LEFT and JUMP
+//   simultaneously delivers two separate onTouchStart events to two
+//   different Views. That's true multi-touch, and it works without any
+//   native module (no crashes on new-arch / older Android versions).
 //
-// LAYOUTS:
-//   • Standard mode: LEFT/RIGHT bottom-left, JUMP bottom-right.
-//   • One-thumb mode: All three buttons stacked on the LEFT side.
-//
-// UX niceties: enlarged hit-slop (bigger effective touch area than the
-// visible glyph), lighter jump button, cyan/purple neon accents, dark base.
+// The one gotcha: `onTouchEnd` fires only for the last-ended pointer on
+// the same View. To be safe we also treat `onTouchCancel` (which fires
+// when the OS steals the touch — e.g. system gesture) as a release, and
+// we NEVER return true from a responder callback (which would put us
+// back into the single-responder-at-a-time regime).
 
 import React, { useCallback, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { StyleSheet, Text, View, ViewStyle } from "react-native";
 
 import { COLORS } from "./constants";
 import { haptic } from "./haptics";
@@ -36,10 +35,21 @@ interface Props {
   opacity?: number;   // 0.4 – 1.0 (default 0.85). Applied to whole overlay.
 }
 
+interface ButtonProps {
+  testID: string;
+  onPress: () => void;
+  onRelease: () => void;
+  disabled?: boolean;
+  slop: number;
+  containerStyle: ViewStyle;
+  activeStyle: ViewStyle;
+  children: React.ReactNode;
+}
+
 /**
- * Single button that reports press-in / press-out via a LongPress gesture
- * (min duration 0). Renders its own pressed state so we don't need to
- * re-render the parent controls on every touch event.
+ * A tap-and-hold button that uses raw React Native touch events. Multi-
+ * touch friendly, zero native-module dependencies, no responder-system
+ * involvement.
  */
 function GameButton({
   testID,
@@ -50,47 +60,34 @@ function GameButton({
   containerStyle,
   activeStyle,
   children,
-}: {
-  testID: string;
-  onPress: () => void;
-  onRelease: () => void;
-  disabled?: boolean;
-  slop: number;
-  containerStyle: any;
-  activeStyle: any;
-  children: React.ReactNode;
-}) {
+}: ButtonProps) {
   const [pressed, setPressed] = useState(false);
-  // `runOnJS` is unnecessary here — LongPress's callbacks are already on the
-  // JS thread when the gesture is built without a worklet-mode explicit flag.
-  const gesture = React.useMemo(
-    () =>
-      Gesture.LongPress()
-        .minDuration(0)              // fire on touch-down, not after a delay
-        .maxDistance(10_000)         // never cancel on slight finger drift
-        .shouldCancelWhenOutside(false)
-        .enabled(!disabled)
-        .onBegin(() => {
-          setPressed(true);
-          onPress();
-        })
-        .onFinalize(() => {
-          setPressed(false);
-          onRelease();
-        }),
-    [disabled, onPress, onRelease],
-  );
+
+  const handleStart = () => {
+    if (disabled) return;
+    setPressed(true);
+    onPress();
+  };
+  const handleEnd = () => {
+    if (disabled) return;
+    setPressed(false);
+    onRelease();
+  };
 
   return (
-    <GestureDetector gesture={gesture}>
-      <View
-        testID={testID}
-        hitSlop={slop}
-        style={[containerStyle, pressed && activeStyle]}
-      >
-        {children}
-      </View>
-    </GestureDetector>
+    <View
+      testID={testID}
+      hitSlop={{ top: slop, bottom: slop, left: slop, right: slop }}
+      onTouchStart={handleStart}
+      onTouchEnd={handleEnd}
+      onTouchCancel={handleEnd}
+      // Guard against edge cases where the OS drops a touch stream: also
+      // release if the finger leaves our bounds without firing end.
+      onTouchMove={() => {}}
+      style={[containerStyle, pressed && activeStyle]}
+    >
+      {children}
+    </View>
   );
 }
 
@@ -109,7 +106,6 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   const disabled = !!paused;
   const alpha = typeof opacity === "number" ? Math.max(0.4, Math.min(1, opacity)) : 0.85;
 
-  // Callbacks are stable — GameButton memoises on identity.
   const leftDown = useCallback(() => set("left", true), [set]);
   const leftUp = useCallback(() => set("left", false), [set]);
   const rightDown = useCallback(() => set("right", true), [set]);
