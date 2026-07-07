@@ -183,34 +183,40 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
     pressedButtons[id] ? [base, active] : base;
 
   if (oneThumb) {
+    // Compact single-thumb layout: JUMP on top, LEFT/RIGHT below — all in
+    // the bottom-left corner, sized so a single thumb can reach every
+    // button without sliding. Mimics a Game Boy style D-pad + face button.
     return (
       <View style={[styles.root, { opacity: alpha }]} {...responderProps}>
         <View style={styles.oneThumbCluster}>
-          <View
-            testID="btn-left"
-            ref={(r) => { btnRefs.current.left = r; }}
-            onLayout={measureButton("left", 22)}
-            style={styleFor("left", styles.padBtn, styles.padBtnActive)}
-          >
-            <Text style={styles.padGlyph}>{"\u25C0"}</Text>
-          </View>
-          <View style={{ width: 10 }} />
+          {/* Top row: JUMP centred over the D-pad */}
           <View
             testID="btn-jump"
             ref={(r) => { btnRefs.current.jump = r; }}
-            onLayout={measureButton("jump", 20)}
-            style={styleFor("jump", styles.jumpBtn, styles.jumpBtnActive)}
+            onLayout={measureButton("jump", 22)}
+            style={styleFor("jump", styles.oneThumbJump, styles.jumpBtnActive)}
           >
-            <Text style={styles.jumpLabel}>JUMP</Text>
+            <Text style={styles.oneThumbJumpLabel}>JUMP</Text>
           </View>
-          <View style={{ width: 10 }} />
-          <View
-            testID="btn-right"
-            ref={(r) => { btnRefs.current.right = r; }}
-            onLayout={measureButton("right", 22)}
-            style={styleFor("right", styles.padBtn, styles.padBtnActive)}
-          >
-            <Text style={styles.padGlyph}>{"\u25B6"}</Text>
+          {/* Bottom row: LEFT + RIGHT */}
+          <View style={styles.oneThumbRow}>
+            <View
+              testID="btn-left"
+              ref={(r) => { btnRefs.current.left = r; }}
+              onLayout={measureButton("left", 24)}
+              style={styleFor("left", styles.oneThumbPad, styles.padBtnActive)}
+            >
+              <Text style={styles.padGlyph}>{"\u25C0"}</Text>
+            </View>
+            <View style={{ width: 8 }} />
+            <View
+              testID="btn-right"
+              ref={(r) => { btnRefs.current.right = r; }}
+              onLayout={measureButton("right", 24)}
+              style={styleFor("right", styles.oneThumbPad, styles.padBtnActive)}
+            >
+              <Text style={styles.padGlyph}>{"\u25B6"}</Text>
+            </View>
           </View>
         </View>
       </View>
@@ -271,8 +277,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   oneThumbCluster: {
+    // Vertical stack: JUMP on top, then a row of LEFT/RIGHT below.
+    // Aligned to the bottom-left of the screen (thumb resting position).
+    alignItems: "center",
+    gap: 8,
+  },
+  oneThumbRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  oneThumbJump: {
+    width: 78,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(157, 0, 255, 0.22)",
+    borderWidth: 2,
+    borderColor: COLORS.purple,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  oneThumbJumpLabel: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 2,
+  },
+  oneThumbPad: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "rgba(22, 24, 36, 0.75)",
+    borderWidth: 1.5,
+    borderColor: COLORS.borderGlow,
+    alignItems: "center",
+    justifyContent: "center",
   },
   padBtn: {
     width: 66,
