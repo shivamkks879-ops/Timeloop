@@ -1,25 +1,35 @@
-// Touch controls — reliable multi-touch via a single-container touch tracker.
+// Touch controls — per-button `Pressable` for maximum reliability.
 //
-// Approach:
-//   The whole controls overlay is ONE `<View>` with `onTouchStart/Move/End/Cancel`
-//   handlers. We manually track every active touch pointer by its unique
-//   `identifier`, and assign each pointer to whichever button it first
-//   touched. When a pointer lifts, we release *only* that pointer's button.
+// Architecture:
+//   Each control button is an independent `Pressable`. React Native's
+//   PressResponder handles the touch lifecycle per-view, which means:
+//     • `onPressIn`  → guaranteed to fire when a finger lands on the button
+//     • `onPressOut` → guaranteed to fire when the finger lifts OR the OS
+//                      terminates the responder (system gesture, modal open,
+//                      app backgrounded). This is what killed the classic
+//                      "auto-walk" bug — no manual touch-identifier tracking
+//                      needed.
+//     • Each button is its own responder, so multi-touch (LEFT + JUMP
+//       together) works naturally — RN routes each finger to whichever
+//       Pressable it touched.
 //
-// Why this pattern:
-//   • React Native's per-View `onTouchEnd` on a `Pressable` or bare `View`
-//     can silently drop the end event when the touch responder is stolen
-//     by another button that starts under a different finger.  That leads
-//     to the classic "character keeps walking" bug on Android.
-//   • By handling all touches at a single parent View, we avoid the
-//     responder-transfer problem entirely.  Android delivers ALL active
-//     touches to that one view every frame.
+// The root wrapper uses `pointerEvents="box-none"` so:
+//   • Empty areas between buttons DO NOT capture touches → HUD (pause /
+//     restart) remains accessible above.
+//   • The game canvas below still receives no touches (it doesn't listen),
+//     but that's fine — we don't need to steal them.
 //
-// This gives true concurrent multi-touch (LEFT+JUMP together works), never
-// gets stuck, and needs zero native modules — safe on every Android build.
+// Safety nets:
+//   1. `AppState` listener — if the app is backgrounded (call, notification,
+//      home button), we forcibly release every button so nothing is stuck
+//      when the user returns.
+//   2. `disabled` prop (pause / outcome overlay open) — clears state via
+//      an effect so no button remains latched behind a modal.
+//   3. `hitSlop` — 24 px expansion on every button so a slightly-off tap
+//      still registers (kind to fat thumbs).
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { GestureResponderEvent, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { COLORS } from "./constants";
 import { haptic } from "./haptics";
@@ -34,189 +44,126 @@ interface Props {
   onChange: (s: ControlState) => void;
   paused?: boolean;
   oneThumb?: boolean;
-  opacity?: number;   // 0.4 – 1.0 (default 0.85). Applied to whole overlay.
+  opacity?: number; // 0.4 – 1.0 (default 0.85). Applied to whole overlay.
 }
 
 type ButtonId = "left" | "right" | "jump";
 
-interface Hitbox {
-  id: ButtonId;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  slop: number;
-}
-
 export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   const stateRef = useRef<ControlState>({ left: false, right: false, jump: false });
-  const [pressedButtons, setPressedButtons] = useState<Record<ButtonId, boolean>>({
+  const [pressed, setPressed] = useState<Record<ButtonId, boolean>>({
     left: false,
     right: false,
     jump: false,
   });
 
-  // Layout: each button reports its measured position into this ref
-  // (relative to the parent container) so the touch tracker knows what
-  // pointer position corresponds to which button.
-  const hitboxesRef = useRef<Record<ButtonId, Hitbox | null>>({ left: null, right: null, jump: null });
-  // Refs to the button Views so we can measure their absolute page coords
-  // whenever the layout tree changes (rotation, safe-area updates).
-  const btnRefs = useRef<Record<ButtonId, View | null>>({ left: null, right: null, jump: null });
-
-  // Pointer-identifier → button-id map.  When a touch starts we look up
-  // which button it fell on; when it ends we release that button.
-  const activeTouchesRef = useRef<Map<string, ButtonId>>(new Map());
-
   const disabled = !!paused;
   const alpha = typeof opacity === "number" ? Math.max(0.4, Math.min(1, opacity)) : 0.85;
 
-  const emit = useCallback(() => {
-    onChange({ ...stateRef.current });
+  // Keep the latest onChange in a ref so setBtn doesn't need to be
+  // memoized against it (prevents Pressable prop-churn re-renders).
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
   }, [onChange]);
 
-  const setBtn = useCallback(
-    (id: ButtonId, v: boolean) => {
-      if (stateRef.current[id] === v) return;
-      stateRef.current[id] = v;
-      if (v) haptic("ui");
-      emit();
-      setPressedButtons((p) => ({ ...p, [id]: v }));
-    },
-    [emit],
-  );
-
-  // Given absolute page (x,y) from a touch event, figure out which button
-  // — if any — the pointer fell on. Uses each hitbox's page-space bounds
-  // (populated via `measure`) plus a `slop` margin for forgiving hits.
-  const hitTest = useCallback((pageX: number, pageY: number): ButtonId | null => {
-    const boxes = hitboxesRef.current;
-    for (const id of ["left", "right", "jump"] as const) {
-      const b = boxes[id];
-      if (!b) continue;
-      if (
-        pageX >= b.x - b.slop &&
-        pageX <= b.x + b.w + b.slop &&
-        pageY >= b.y - b.slop &&
-        pageY <= b.y + b.h + b.slop
-      ) {
-        return id;
-      }
-    }
-    return null;
+  const setBtn = useCallback((id: ButtonId, v: boolean) => {
+    if (stateRef.current[id] === v) return;
+    stateRef.current[id] = v;
+    if (v) haptic("ui");
+    onChangeRef.current({ ...stateRef.current });
+    setPressed((p) => (p[id] === v ? p : { ...p, [id]: v }));
   }, []);
 
-  const onTouchStart = (e: GestureResponderEvent) => {
-    if (disabled) return;
-    const changed = e.nativeEvent.changedTouches;
-    for (const t of changed) {
-      // Use page-absolute coordinates so we don't depend on which View is
-      // the responder or how deep we are in the layout tree.
-      const id = hitTest(t.pageX, t.pageY);
-      if (!id) continue;
-      activeTouchesRef.current.set(String(t.identifier), id);
+  const releaseAll = useCallback(() => {
+    let dirty = false;
+    for (const id of ["left", "right", "jump"] as const) {
+      if (stateRef.current[id]) {
+        stateRef.current[id] = false;
+        dirty = true;
+      }
+    }
+    if (dirty) {
+      onChangeRef.current({ ...stateRef.current });
+      setPressed({ left: false, right: false, jump: false });
+    }
+  }, []);
+
+  // Reset when paused / outcome overlay opens — otherwise a button pressed
+  // at the moment of pause would remain latched behind the modal.
+  useEffect(() => {
+    if (disabled) releaseAll();
+  }, [disabled, releaseAll]);
+
+  // AppState safety net: if the OS pulls the app to background (call,
+  // notification, home swipe), release every button. This kills the last
+  // possible source of a stuck-input bug because pressOut is guaranteed
+  // to fire on background transition on every RN version we've tested,
+  // but this belt-and-braces reset costs nothing.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next !== "active") releaseAll();
+    });
+    return () => sub.remove();
+  }, [releaseAll]);
+
+  const makeHandlers = (id: ButtonId) => ({
+    onPressIn: () => {
+      if (disabled) return;
       setBtn(id, true);
-    }
-  };
-
-  const onTouchMove = () => {
-    // We deliberately do NOT reassign a button on move.  A finger can
-    // slide off a button (into the neighbouring slop) without breaking
-    // the input — feels much better than a "twitchy" release-on-slide.
-  };
-
-  const releaseTouches = (e: GestureResponderEvent) => {
-    if (disabled) return;
-    const changed = e.nativeEvent.changedTouches;
-    for (const t of changed) {
-      const key = String(t.identifier);
-      const id = activeTouchesRef.current.get(key);
-      if (!id) continue;
-      activeTouchesRef.current.delete(key);
-      // Only release the button if no OTHER active touch is still
-      // holding it (safe against "one finger held while another taps
-      // the same button").
-      const stillHeld = Array.from(activeTouchesRef.current.values()).some((v) => v === id);
-      if (!stillHeld) setBtn(id, false);
-    }
-  };
-
-  const onTouchEnd = releaseTouches;
-  const onTouchCancel = releaseTouches;
-
-  const measureButton = useCallback(
-    (id: ButtonId, slop: number) => () => {
-      const node = btnRefs.current[id];
-      if (!node) return;
-      // measureInWindow → page-absolute (x, y, width, height). We ignore
-      // scroll offsets because there's no scrolling in the controls layer.
-      // Some RN internals return the callback synchronously; catch a
-      // potentially undefined implementation and skip if missing.
-      const measurable = node as unknown as { measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void };
-      if (typeof measurable.measureInWindow !== "function") return;
-      measurable.measureInWindow((x, y, w, h) => {
-        hitboxesRef.current[id] = { id, x, y, w, h, slop };
-      });
     },
-    [],
-  );
-
-  // Container is a single View that captures every touch in its bounds.
-  // `onStartShouldSetResponder` must return true so React Native routes
-  // the whole touch stream to this View instead of a child.
-  const responderProps = useMemo(
-    () => ({
-      onStartShouldSetResponder: () => true,
-      onMoveShouldSetResponder: () => true,
-      onResponderTerminationRequest: () => false,
-      onTouchStart,
-      onTouchMove,
-      onTouchEnd,
-      onTouchCancel,
-    }),
-    // Handlers close over refs — stable identities are fine here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [disabled],
-  );
-
-  const styleFor = (id: ButtonId, base: any, active: any) =>
-    pressedButtons[id] ? [base, active] : base;
+    onPressOut: () => setBtn(id, false),
+    // Fire pressIn immediately — no ripple / long-press delay. Critical
+    // for a precision platformer where the frame you tap JUMP matters.
+    unstable_pressDelay: 0,
+    android_disableSound: true,
+    android_ripple: null,
+  });
 
   if (oneThumb) {
     // Compact single-thumb layout: JUMP on top, LEFT/RIGHT below — all in
     // the bottom-left corner, sized so a single thumb can reach every
     // button without sliding. Mimics a Game Boy style D-pad + face button.
     return (
-      <View style={[styles.root, { opacity: alpha }]} {...responderProps}>
-        <View style={styles.oneThumbCluster}>
+      <View style={[styles.root, { opacity: alpha }]} pointerEvents="box-none">
+        <View style={styles.oneThumbCluster} pointerEvents="box-none">
           {/* Top row: JUMP centred over the D-pad */}
-          <View
+          <Pressable
             testID="btn-jump"
-            ref={(r) => { btnRefs.current.jump = r; }}
-            onLayout={measureButton("jump", 22)}
-            style={styleFor("jump", styles.oneThumbJump, styles.jumpBtnActive)}
+            hitSlop={24}
+            {...makeHandlers("jump")}
+            style={({ pressed: p }) => [
+              styles.oneThumbJump,
+              (p || pressed.jump) && styles.jumpBtnActive,
+            ]}
           >
             <Text style={styles.oneThumbJumpLabel}>JUMP</Text>
-          </View>
+          </Pressable>
           {/* Bottom row: LEFT + RIGHT */}
-          <View style={styles.oneThumbRow}>
-            <View
+          <View style={styles.oneThumbRow} pointerEvents="box-none">
+            <Pressable
               testID="btn-left"
-              ref={(r) => { btnRefs.current.left = r; }}
-              onLayout={measureButton("left", 24)}
-              style={styleFor("left", styles.oneThumbPad, styles.padBtnActive)}
+              hitSlop={26}
+              {...makeHandlers("left")}
+              style={({ pressed: p }) => [
+                styles.oneThumbPad,
+                (p || pressed.left) && styles.padBtnActive,
+              ]}
             >
               <Text style={styles.padGlyph}>{"\u25C0"}</Text>
-            </View>
+            </Pressable>
             <View style={{ width: 8 }} />
-            <View
+            <Pressable
               testID="btn-right"
-              ref={(r) => { btnRefs.current.right = r; }}
-              onLayout={measureButton("right", 24)}
-              style={styleFor("right", styles.oneThumbPad, styles.padBtnActive)}
+              hitSlop={26}
+              {...makeHandlers("right")}
+              style={({ pressed: p }) => [
+                styles.oneThumbPad,
+                (p || pressed.right) && styles.padBtnActive,
+              ]}
             >
               <Text style={styles.padGlyph}>{"\u25B6"}</Text>
-            </View>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -224,36 +171,45 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   }
 
   return (
-    <View style={[styles.root, { opacity: alpha }]} {...responderProps}>
-      <View style={styles.leftCluster}>
-        <View
+    <View style={[styles.root, { opacity: alpha }]} pointerEvents="box-none">
+      <View style={styles.leftCluster} pointerEvents="box-none">
+        <Pressable
           testID="btn-left"
-          ref={(r) => { btnRefs.current.left = r; }}
-          onLayout={measureButton("left", 22)}
-          style={styleFor("left", styles.padBtn, styles.padBtnActive)}
+          hitSlop={24}
+          {...makeHandlers("left")}
+          style={({ pressed: p }) => [
+            styles.padBtn,
+            (p || pressed.left) && styles.padBtnActive,
+          ]}
         >
           <Text style={styles.padGlyph}>{"\u25C0"}</Text>
-        </View>
+        </Pressable>
         <View style={{ width: 18 }} />
-        <View
+        <Pressable
           testID="btn-right"
-          ref={(r) => { btnRefs.current.right = r; }}
-          onLayout={measureButton("right", 22)}
-          style={styleFor("right", styles.padBtn, styles.padBtnActive)}
+          hitSlop={24}
+          {...makeHandlers("right")}
+          style={({ pressed: p }) => [
+            styles.padBtn,
+            (p || pressed.right) && styles.padBtnActive,
+          ]}
         >
           <Text style={styles.padGlyph}>{"\u25B6"}</Text>
-        </View>
+        </Pressable>
       </View>
 
-      <View style={styles.rightCluster}>
-        <View
+      <View style={styles.rightCluster} pointerEvents="box-none">
+        <Pressable
           testID="btn-jump"
-          ref={(r) => { btnRefs.current.jump = r; }}
-          onLayout={measureButton("jump", 20)}
-          style={styleFor("jump", styles.jumpBtn, styles.jumpBtnActive)}
+          hitSlop={22}
+          {...makeHandlers("jump")}
+          style={({ pressed: p }) => [
+            styles.jumpBtn,
+            (p || pressed.jump) && styles.jumpBtnActive,
+          ]}
         >
           <Text style={styles.jumpLabel}>JUMP</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -277,8 +233,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   oneThumbCluster: {
-    // Vertical stack: JUMP on top, then a row of LEFT/RIGHT below.
-    // Aligned to the bottom-left of the screen (thumb resting position).
     alignItems: "center",
     gap: 8,
   },
