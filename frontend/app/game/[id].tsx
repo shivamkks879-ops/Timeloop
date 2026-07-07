@@ -111,7 +111,6 @@ export default function GameScreen() {
           if (p.onGround && !cur.player.onGround && cur.player.vy * gDir < 0) {
             playCue("jump");
             haptic("jump");
-            // Small dust puff at the player's feet on jump.
             const feetY = cur.player.gravityDir === 1
               ? cur.player.y + 28
               : cur.player.y;
@@ -119,7 +118,7 @@ export default function GameScreen() {
               x: cur.player.x + 11,
               y: feetY,
               color: "rgba(0, 229, 255, 0.9)",
-              count: 6,
+              count: 4,
               speed: 2.4,
               life: 320,
               radius: 2,
@@ -130,14 +129,12 @@ export default function GameScreen() {
           if (!p.onGround && cur.player.onGround) {
             playCue("land");
             haptic("land");
-            // Landing dust — direction of gravity determines side. Enough
-            // impact velocity → bigger puff (falls trigger louder land).
             const fallSpeed = Math.abs(p.vy);
             if (fallSpeed > 1.5) {
               const feetY = cur.player.gravityDir === 1
                 ? cur.player.y + 28
                 : cur.player.y;
-              const dustCount = fallSpeed > 8 ? 12 : 7;
+              const dustCount = fallSpeed > 8 ? 7 : 4;
               spawnBurst({
                 x: cur.player.x + 11,
                 y: feetY,
@@ -148,7 +145,6 @@ export default function GameScreen() {
                 radius: 2,
                 gravity: cur.player.gravityDir === 1 ? -0.05 : 0.05,
               });
-              // Small screen kick on a hard landing (falls > 8 px/tick).
               if (fallSpeed > 8) {
                 shakeRef.current = { ticks: 6, peak: 2.5 };
               }
@@ -162,7 +158,7 @@ export default function GameScreen() {
               x: cur.player.x + 11,
               y: cur.player.y + 14,
               color: "rgba(157, 0, 255, 0.95)",
-              count: 14,
+              count: 8,
               speed: 3.4,
               life: 480,
               radius: 3,
@@ -177,7 +173,7 @@ export default function GameScreen() {
               x: cur.player.x + 11,
               y: cur.player.y + 14,
               color: "rgba(0, 255, 136, 0.95)",
-              count: 12,
+              count: 7,
               speed: 2.6,
               life: 520,
               radius: 3,
@@ -192,7 +188,7 @@ export default function GameScreen() {
               x: cur.player.x + 11,
               y: cur.player.y + 14,
               color: "rgba(255, 0, 60, 0.95)",
-              count: 22,
+              count: 12,
               speed: 4.2,
               life: 620,
               radius: 3,
@@ -212,19 +208,17 @@ export default function GameScreen() {
             playCue("rewind");
             playCue("echo_create");
             haptic("rewind");
-            // Rewind burst at spawn position.
             spawnBurst({
               x: cur.spawnX + 11,
               y: cur.spawnY + 14,
               color: "rgba(157, 0, 255, 0.9)",
-              count: 26,
+              count: 14,
               speed: 4.5,
               life: 780,
               radius: 3,
               gravity: 0,
             });
             shakeRef.current = { ticks: 20, peak: 8 };
-            // Reset event tracker for the fresh loop.
             prevRef.current.onGround = true;
             prevRef.current.alive = true;
             prevRef.current.vy = 0;
@@ -252,7 +246,7 @@ export default function GameScreen() {
             x: s.player.x + 11,
             y: s.player.y + 14,
             color: "rgba(0, 229, 255, 0.95)",
-            count: 30,
+            count: 16,
             speed: 5,
             life: 900,
             radius: 3,
@@ -262,7 +256,7 @@ export default function GameScreen() {
             x: s.player.x + 11,
             y: s.player.y + 14,
             color: "rgba(0, 255, 136, 0.95)",
-            count: 18,
+            count: 10,
             speed: 3.6,
             life: 780,
             radius: 3,

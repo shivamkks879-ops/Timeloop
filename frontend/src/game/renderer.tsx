@@ -50,15 +50,13 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         const px = x * SIM.TILE;
         const py = y * SIM.TILE;
         if (t === "#") {
-          // Solid tile — darker fill with a subtle cyan rim (30% dimmer than
-          // before) so the level backdrop reads as background rather than
-          // competing with gameplay elements.
+          // Solid tile — darker fill with a subtle cyan rim. Single-node
+          // render (no inner highlight rect) keeps the fill cheap; a
+          // 24-tile-wide level still renders 200+ tiles per frame.
           nodes.push(
             <Group key={`s${x},${y}`}>
               <RoundedRect x={px + 1} y={py + 1} width={SIM.TILE - 2} height={SIM.TILE - 2} r={3} color="#141826" />
               <RoundedRect x={px + 1} y={py + 1} width={SIM.TILE - 2} height={SIM.TILE - 2} r={3} color={COLORS.cyan} style="stroke" strokeWidth={1} opacity={0.22} />
-              {/* Faint inner highlight so the tile still reads as a solid block. */}
-              <Rect x={px + 3} y={py + 3} width={SIM.TILE - 6} height={2} color={COLORS.cyan} opacity={0.06} />
             </Group>
           );
         } else if (t === "^") {
@@ -69,20 +67,13 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
           path.lineTo(px + (SIM.TILE * 3) / 4, py + SIM.TILE / 2);
           path.lineTo(px + SIM.TILE, py + SIM.TILE);
           path.close();
-          // Amplified danger glow: two-layer red bloom so spikes read
-          // instantly at any zoom level.
+          // Spike hazard: solid body + one blur pass (dropped the outer
+          // bloom + inner highlight to halve the fragment work here).
           nodes.push(
             <Group key={`sp${x},${y}`}>
-              {/* Outer bloom */}
-              <Path path={path} color={COLORS.red} opacity={0.5}>
-                <Blur blur={7} />
-              </Path>
-              {/* Solid body */}
               <Path path={path} color={COLORS.red} />
-              {/* Sharp inner stroke */}
-              <Path path={path} color="#FFD5DA" style="stroke" strokeWidth={0.6} opacity={0.75} />
               <Path path={path} color={COLORS.red} style="stroke" strokeWidth={1.5}>
-                <Blur blur={3} />
+                <Blur blur={2.5} />
               </Path>
             </Group>
           );
@@ -328,24 +319,21 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
 
   // Particles are pure eye-candy: read from the module-level pool and render
   // as fading circles. Runs each frame — always uses fresh Date.now().
+  // Kept intentionally cheap: a *single* Circle per particle (no Blur), so
+  // hundreds can render at 60 FPS on mid-range Android without stutter.
   const now = Date.now();
   const particles = getLiveParticles(now);
   const particleNodes = particles.map((p) => {
     const age = (now - p.bornAt) / p.life;   // 0..1
     if (age >= 1) return null;
-    // Integrate against age using life ms so particle velocity is roughly
-    // consistent across framerates.
     const t = (now - p.bornAt) / (1000 / 60);
     const px = p.x + p.vx * t;
     const py = p.y + p.vy * t + 0.5 * p.gravity * t * t;
     const alpha = 1 - age;
+    // Slight radius grow-then-shrink for a punchy pop.
+    const r = p.radius * (1 + 0.2 * Math.sin(age * Math.PI));
     return (
-      <Group key={`pt${p.id}`}>
-        <Circle cx={px} cy={py} r={p.radius + 3} color={p.color} opacity={alpha * 0.35}>
-          <Blur blur={5} />
-        </Circle>
-        <Circle cx={px} cy={py} r={p.radius} color={p.color} opacity={alpha} />
-      </Group>
+      <Circle key={`pt${p.id}`} cx={px} cy={py} r={r} color={p.color} opacity={alpha} />
     );
   });
 
@@ -361,19 +349,6 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
           star's position wraps around the viewport so the field is
           seamless. Rendered BEFORE the world so it feels like a backdrop. */}
       <BackgroundStars width={width} height={height} frame={animFrame} />
-
-      {/* Nebula tint — a soft purple wash that slowly shifts opacity so
-          the background has a living, breathing quality. */}
-      <Rect
-        x={0}
-        y={0}
-        width={width}
-        height={height}
-        color="#3A1560"
-        opacity={0.07 + 0.03 * Math.sin(animFrame / 240)}
-      >
-        <Blur blur={40} />
-      </Rect>
 
       {timeLow ? (
         <Rect x={0} y={0} width={width} height={height} color={COLORS.red} opacity={0.08} />
@@ -408,7 +383,9 @@ function BackgroundStars({ width, height, frame }: { width: number; height: numb
       seed = (seed * 1664525 + 1013904223) % 4294967296;
       return seed / 4294967296;
     };
-    for (let i = 0; i < 90; i++) {
+    // 45 stars (halved from 90) — still gives a dense parallax feel on
+    // phone-sized viewports but noticeably cheaper on the render thread.
+    for (let i = 0; i < 45; i++) {
       const depth = rand();
       out.push({
         x: rand() * width * 1.4,

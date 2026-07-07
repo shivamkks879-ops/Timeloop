@@ -29,7 +29,10 @@ export interface Particle {
 
 let PARTICLES: Particle[] = [];
 let NEXT_ID = 1;
-const MAX_PARTICLES = 220;
+// Reduced from 220 → 120. On phone-sized viewports the difference is
+// invisible (particles overlap heavily anyway) but the draw-call count
+// drops by ~45%, which keeps 60 FPS solid on mid-range Android.
+const MAX_PARTICLES = 120;
 
 export function spawnBurst(opts: {
   x: number;
