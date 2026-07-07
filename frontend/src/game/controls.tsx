@@ -1,35 +1,29 @@
-// Touch controls — per-button `Pressable` for maximum reliability.
+// Touch controls — powered by `react-native-gesture-handler` v2 gestures.
 //
-// Architecture:
-//   Each control button is an independent `Pressable`. React Native's
-//   PressResponder handles the touch lifecycle per-view, which means:
-//     • `onPressIn`  → guaranteed to fire when a finger lands on the button
-//     • `onPressOut` → guaranteed to fire when the finger lifts OR the OS
-//                      terminates the responder (system gesture, modal open,
-//                      app backgrounded). This is what killed the classic
-//                      "auto-walk" bug — no manual touch-identifier tracking
-//                      needed.
-//     • Each button is its own responder, so multi-touch (LEFT + JUMP
-//       together) works naturally — RN routes each finger to whichever
-//       Pressable it touched.
+// Why gesture-handler and not raw Pressable / touch events?
+//   • RN's built-in Pressable + touch responder system SERIALISES touches
+//     through JS on Android, which regularly drops the second finger when
+//     you press LEFT + JUMP together. That produced the "auto-walk" and
+//     "jump doesn't fire" bugs.
+//   • gesture-handler v2 runs on the UI thread and treats every button as
+//     an INDEPENDENT gesture — Android's MotionEvent stream is split per
+//     pointer, so LEFT and JUMP can fire simultaneously and never fight
+//     over the responder.
+//   • `Gesture.LongPress().minDuration(0)` acts as a pure "press and hold"
+//     gesture with zero delay. `onStart` fires the instant the finger
+//     lands; `onFinalize` fires whenever the finger lifts, whenever the
+//     gesture is cancelled by the OS, and even if the app goes into
+//     background — guaranteeing NO stuck-input state.
+//   • `shouldCancelWhenOutside(false)` keeps the button pressed if the
+//     finger slides slightly off the hitbox (thumb pressure spread).
 //
-// The root wrapper uses `pointerEvents="box-none"` so:
-//   • Empty areas between buttons DO NOT capture touches → HUD (pause /
-//     restart) remains accessible above.
-//   • The game canvas below still receives no touches (it doesn't listen),
-//     but that's fine — we don't need to steal them.
-//
-// Safety nets:
-//   1. `AppState` listener — if the app is backgrounded (call, notification,
-//      home button), we forcibly release every button so nothing is stuck
-//      when the user returns.
-//   2. `disabled` prop (pause / outcome overlay open) — clears state via
-//      an effect so no button remains latched behind a modal.
-//   3. `hitSlop` — 24 px expansion on every button so a slightly-off tap
-//      still registers (kind to fat thumbs).
+// The root view uses `pointerEvents="box-none"` so touches outside the
+// buttons pass through to the HUD (pause / restart) and never leak into
+// the game canvas.
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, StyleSheet, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import { COLORS } from "./constants";
 import { haptic } from "./haptics";
@@ -60,12 +54,19 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   const disabled = !!paused;
   const alpha = typeof opacity === "number" ? Math.max(0.4, Math.min(1, opacity)) : 0.85;
 
-  // Keep the latest onChange in a ref so setBtn doesn't need to be
-  // memoized against it (prevents Pressable prop-churn re-renders).
+  // Latest onChange ref — decouples the gesture callbacks from parent
+  // re-renders so the gestures themselves are stable references.
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  // Disabled ref — read from inside the JS-thread gesture callbacks so
+  // we don't have to rebuild the gesture objects on pause/resume.
+  const disabledRef = useRef(disabled);
+  useEffect(() => {
+    disabledRef.current = disabled;
+  }, [disabled]);
 
   const setBtn = useCallback((id: ButtonId, v: boolean) => {
     if (stateRef.current[id] === v) return;
@@ -96,10 +97,8 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   }, [disabled, releaseAll]);
 
   // AppState safety net: if the OS pulls the app to background (call,
-  // notification, home swipe), release every button. This kills the last
-  // possible source of a stuck-input bug because pressOut is guaranteed
-  // to fire on background transition on every RN version we've tested,
-  // but this belt-and-braces reset costs nothing.
+  // notification, home swipe), release every button. gesture-handler's
+  // onFinalize will fire on backgrounding too, but this is belt-and-braces.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
       if (next !== "active") releaseAll();
@@ -107,143 +106,114 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
     return () => sub.remove();
   }, [releaseAll]);
 
-  const makeHandlers = (id: ButtonId) => ({
-    onPressIn: () => {
-      if (disabled) return;
-      setBtn(id, true);
-    },
-    onPressOut: () => setBtn(id, false),
-    // Fire pressIn immediately — no ripple / long-press delay. Critical
-    // for a precision platformer where the frame you tap JUMP matters.
-    unstable_pressDelay: 0,
-    android_disableSound: true,
-    android_ripple: null,
-  });
+  // Build one LongPress gesture per button. Each gesture:
+  //   • Fires immediately (minDuration 0) — no press-and-hold delay
+  //   • Stays active if the finger drifts off the hitbox
+  //   • Runs on the JS thread so we can call setState directly (no
+  //     `runOnJS` wrapper needed — gesture-handler v2 handles this via
+  //     `.runOnJS(true)`).
+  //   • `onStart` = finger DOWN, `onFinalize` = finger UP / cancelled /
+  //     app-backgrounded / OS-terminated. Both firing is guaranteed.
+  //
+  // Because each button owns its OWN gesture on its OWN view, Android
+  // dispatches concurrent MotionEvents to each independently — that's
+  // what makes true multi-touch (LEFT+JUMP together) work.
+  const makeGesture = useCallback(
+    (id: ButtonId) =>
+      Gesture.LongPress()
+        .minDuration(0)
+        .maxDistance(10000) // effectively disable movement-based cancel
+        .shouldCancelWhenOutside(false)
+        .runOnJS(true)
+        .onStart(() => {
+          if (disabledRef.current) return;
+          setBtn(id, true);
+        })
+        .onFinalize(() => {
+          setBtn(id, false);
+        }),
+    [setBtn],
+  );
 
-  // -------- Root-level safety net --------
-  // Touch events BUBBLE through the RN view tree, so even though each
-  // Pressable owns its responder, the root View still receives every
-  // onTouchStart / Move / End fired anywhere inside it. We use those
-  // to guarantee that if `nativeEvent.touches` reports zero active
-  // fingers, NO button remains latched. This kills the last possible
-  // source of the classic "auto-walk" bug on Android — even if a
-  // Pressable somehow drops its onPressOut, the root sweep will clean
-  // it up on the next touch event anywhere on screen.
-  const onAnyTouch = (e: import("react-native").GestureResponderEvent) => {
-    if (disabled) return;
-    const live = e.nativeEvent.touches?.length ?? 0;
-    if (live === 0) {
-      // Any lingering button state must be false.
-      if (stateRef.current.left || stateRef.current.right || stateRef.current.jump) {
-        releaseAll();
-      }
-    }
-  };
+  const leftGesture = useMemo(() => makeGesture("left"), [makeGesture]);
+  const rightGesture = useMemo(() => makeGesture("right"), [makeGesture]);
+  const jumpGesture = useMemo(() => makeGesture("jump"), [makeGesture]);
 
   if (oneThumb) {
-    // Compact single-thumb layout: JUMP on top, LEFT/RIGHT below — all in
-    // the bottom-left corner, sized so a single thumb can reach every
-    // button without sliding. Mimics a Game Boy style D-pad + face button.
+    // Compact single-thumb layout: JUMP on top, LEFT/RIGHT below.
     return (
-      <View
-        style={[styles.root, { opacity: alpha }]}
-        pointerEvents="box-none"
-        onTouchStart={onAnyTouch}
-        onTouchMove={onAnyTouch}
-        onTouchEnd={onAnyTouch}
-        onTouchCancel={onAnyTouch}
-      >
+      <View style={[styles.root, { opacity: alpha }]} pointerEvents="box-none">
         <View style={styles.oneThumbCluster} pointerEvents="box-none">
-          {/* Top row: JUMP centred over the D-pad */}
-          <Pressable
-            testID="btn-jump"
-            hitSlop={24}
-            {...makeHandlers("jump")}
-            style={({ pressed: p }) => [
-              styles.oneThumbJump,
-              (p || pressed.jump) && styles.jumpBtnActive,
-            ]}
-          >
-            <Text style={styles.oneThumbJumpLabel}>JUMP</Text>
-          </Pressable>
-          {/* Bottom row: LEFT + RIGHT */}
+          <GestureDetector gesture={jumpGesture}>
+            <View
+              testID="btn-jump"
+              hitSlop={24}
+              style={[styles.oneThumbJump, pressed.jump && styles.jumpBtnActive]}
+            >
+              <Text style={styles.oneThumbJumpLabel}>JUMP</Text>
+            </View>
+          </GestureDetector>
           <View style={styles.oneThumbRow} pointerEvents="box-none">
-            <Pressable
-              testID="btn-left"
-              hitSlop={26}
-              {...makeHandlers("left")}
-              style={({ pressed: p }) => [
-                styles.oneThumbPad,
-                (p || pressed.left) && styles.padBtnActive,
-              ]}
-            >
-              <Text style={styles.padGlyph}>{"\u25C0"}</Text>
-            </Pressable>
+            <GestureDetector gesture={leftGesture}>
+              <View
+                testID="btn-left"
+                hitSlop={26}
+                style={[styles.oneThumbPad, pressed.left && styles.padBtnActive]}
+              >
+                <Text style={styles.padGlyph}>{"\u25C0"}</Text>
+              </View>
+            </GestureDetector>
             <View style={{ width: 8 }} />
-            <Pressable
-              testID="btn-right"
-              hitSlop={26}
-              {...makeHandlers("right")}
-              style={({ pressed: p }) => [
-                styles.oneThumbPad,
-                (p || pressed.right) && styles.padBtnActive,
-              ]}
-            >
-              <Text style={styles.padGlyph}>{"\u25B6"}</Text>
-            </Pressable>
+            <GestureDetector gesture={rightGesture}>
+              <View
+                testID="btn-right"
+                hitSlop={26}
+                style={[styles.oneThumbPad, pressed.right && styles.padBtnActive]}
+              >
+                <Text style={styles.padGlyph}>{"\u25B6"}</Text>
+              </View>
+            </GestureDetector>
           </View>
         </View>
       </View>
     );
   }
 
+  // Standard landscape layout: D-pad on the left, JUMP on the right.
   return (
-    <View
-      style={[styles.root, { opacity: alpha }]}
-      pointerEvents="box-none"
-      onTouchStart={onAnyTouch}
-      onTouchMove={onAnyTouch}
-      onTouchEnd={onAnyTouch}
-      onTouchCancel={onAnyTouch}
-    >
+    <View style={[styles.root, { opacity: alpha }]} pointerEvents="box-none">
       <View style={styles.leftCluster} pointerEvents="box-none">
-        <Pressable
-          testID="btn-left"
-          hitSlop={24}
-          {...makeHandlers("left")}
-          style={({ pressed: p }) => [
-            styles.padBtn,
-            (p || pressed.left) && styles.padBtnActive,
-          ]}
-        >
-          <Text style={styles.padGlyph}>{"\u25C0"}</Text>
-        </Pressable>
+        <GestureDetector gesture={leftGesture}>
+          <View
+            testID="btn-left"
+            hitSlop={24}
+            style={[styles.padBtn, pressed.left && styles.padBtnActive]}
+          >
+            <Text style={styles.padGlyph}>{"\u25C0"}</Text>
+          </View>
+        </GestureDetector>
         <View style={{ width: 18 }} />
-        <Pressable
-          testID="btn-right"
-          hitSlop={24}
-          {...makeHandlers("right")}
-          style={({ pressed: p }) => [
-            styles.padBtn,
-            (p || pressed.right) && styles.padBtnActive,
-          ]}
-        >
-          <Text style={styles.padGlyph}>{"\u25B6"}</Text>
-        </Pressable>
+        <GestureDetector gesture={rightGesture}>
+          <View
+            testID="btn-right"
+            hitSlop={24}
+            style={[styles.padBtn, pressed.right && styles.padBtnActive]}
+          >
+            <Text style={styles.padGlyph}>{"\u25B6"}</Text>
+          </View>
+        </GestureDetector>
       </View>
 
       <View style={styles.rightCluster} pointerEvents="box-none">
-        <Pressable
-          testID="btn-jump"
-          hitSlop={22}
-          {...makeHandlers("jump")}
-          style={({ pressed: p }) => [
-            styles.jumpBtn,
-            (p || pressed.jump) && styles.jumpBtnActive,
-          ]}
-        >
-          <Text style={styles.jumpLabel}>JUMP</Text>
-        </Pressable>
+        <GestureDetector gesture={jumpGesture}>
+          <View
+            testID="btn-jump"
+            hitSlop={22}
+            style={[styles.jumpBtn, pressed.jump && styles.jumpBtnActive]}
+          >
+            <Text style={styles.jumpLabel}>JUMP</Text>
+          </View>
+        </GestureDetector>
       </View>
     </View>
   );
