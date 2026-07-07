@@ -226,14 +226,14 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
   const eyeOffset = 1.4 * face;
 
   // Visual scale — makes the robot render ~30% larger than its collision
-  // box so the character reads well on phone screens without changing
-  // physics. Scaling is applied around the sprite's centre (cx, cy).
+  // box so it reads well on phone screens without changing physics.
   //
-  // Horizontal flip: `face` is +1 (right) or -1 (left). Multiplying scale-X
-  // by `face` flips the whole robot horizontally so it visibly faces the
-  // travel direction — antenna, arm asymmetry, visor eye all flip with it.
+  // Direction: we do NOT use a scaleX flip here. All directional asymmetry
+  // (arm swing, eye position, jaw bump, antenna lean, visor sweep) is
+  // already multiplied by `face` in the geometry above. Applying an
+  // additional scaleX mirror would double-flip and cancel out — the classic
+  // "character always faces right" bug this file previously suffered.
   const VISUAL_SCALE = 1.35;
-  const flipX = face >= 0 ? VISUAL_SCALE : -VISUAL_SCALE;
 
   return (
     <Group
@@ -241,24 +241,28 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
       transform={[
         { translateX: cx },
         { translateY: cy },
-        { scaleX: flipX },
+        { scaleX: VISUAL_SCALE },
         { scaleY: VISUAL_SCALE },
         { translateX: -cx },
         { translateY: -cy },
       ]}
     >
-      {/* Ambient glow behind body */}
-      <RoundedRect
-        x={x - 3}
-        y={y - 3}
-        width={w + 6}
-        height={h + 6}
-        r={10}
-        color={visor}
-        opacity={0.22}
-      >
-        <Blur blur={6} />
-      </RoundedRect>
+      {/* Ambient glow behind body — skipped on echoes to keep blur passes
+          low. Blur is the single most expensive Skia op on mid-range
+          Android, so we only render one per character (player only). */}
+      {!echo ? (
+        <RoundedRect
+          x={x - 3}
+          y={y - 3}
+          width={w + 6}
+          height={h + 6}
+          r={10}
+          color={visor}
+          opacity={0.22}
+        >
+          <Blur blur={3} />
+        </RoundedRect>
+      ) : null}
 
       {/* Legs (draw before body so they sit behind) */}
       <Path path={legLpath} color={bodyShade} style="stroke" strokeWidth={3} strokeCap="round" />
@@ -277,9 +281,9 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
         strokeWidth={0.8}
         opacity={0.55}
       />
-      {/* Chest bolt */}
+      {/* Chest bolt (blur skipped for echoes) */}
       <Circle cx={cx} cy={bodyY + bodyH / 2} r={1.6} color={visor}>
-        <Blur blur={1.2} />
+        {!echo ? <Blur blur={1.2} /> : null}
       </Circle>
       {/* Underside shade */}
       <Rect
@@ -302,23 +306,28 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
       {/* --- Side-facing details ------------------------------------------ */}
       {/* A crescent-shaped visor sweep that heavily favours the FACING side
           of the head. Together with the eye offset and the jaw bump below,
-          it makes the direction of travel unmistakable at any zoom. */}
+          it makes the direction of travel unmistakable at any zoom.
+          All hardcoded offsets are multiplied by `face` so the whole robot
+          truly mirrors when moving left. */}
       <Circle
-        cx={headCx + 2.4}
+        cx={headCx + 2.4 * face}
         cy={headCy}
         r={headR - 1}
         color={visor}
         opacity={0.55}
       />
       <Circle
-        cx={headCx + 3.5}
+        cx={headCx + 3.5 * face}
         cy={headCy - 0.6}
         r={headR - 2.8}
         color={bodyMain}
       />
-      {/* Bright visor eye — pushed hard to the front-of-face side. */}
+      {/* Bright visor eye — pushed hard to the front-of-face side.
+          The rect is anchored at its LEFT edge; when facing left we shift
+          the anchor back by the width so the eye appears on the LEFT side
+          of the head instead of extending past it. */}
       <RoundedRect
-        x={headCx + 0.4 + eyeOffset * 2}
+        x={face >= 0 ? headCx + 0.4 + eyeOffset * 2 : headCx - 0.4 + eyeOffset * 2 - 5.5}
         y={headCy - 1.3}
         width={5.5}
         height={2.6}
@@ -326,23 +335,21 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
         color="#FFFFFF"
       />
       <RoundedRect
-        x={headCx + 0.6 + eyeOffset * 2}
+        x={face >= 0 ? headCx + 0.6 + eyeOffset * 2 : headCx - 0.6 + eyeOffset * 2 - 5.2}
         y={headCy - 1.4}
         width={5.2}
         height={2.8}
         r={1.2}
         color={visor}
         opacity={0.9}
-      >
-        <Blur blur={1.6} />
-      </RoundedRect>
+      />
       {/* Jaw bump — a small chin nudge on the facing side. */}
-      <Circle cx={headCx + headR * 0.55} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.85} />
+      <Circle cx={headCx + headR * 0.55 * face} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.85} />
 
       {/* Antenna — leans forward toward the facing direction. */}
       <Path path={antennaPath} color={visor} style="stroke" strokeWidth={1.4} strokeCap="round" />
       <Circle cx={antennaTipX} cy={antennaTipY} r={1.8} color={visor}>
-        <Blur blur={1.6} />
+        {!echo ? <Blur blur={1.6} /> : null}
       </Circle>
 
       {/* Thruster when jumping */}

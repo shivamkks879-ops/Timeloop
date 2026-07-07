@@ -120,12 +120,39 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
     android_ripple: null,
   });
 
+  // -------- Root-level safety net --------
+  // Touch events BUBBLE through the RN view tree, so even though each
+  // Pressable owns its responder, the root View still receives every
+  // onTouchStart / Move / End fired anywhere inside it. We use those
+  // to guarantee that if `nativeEvent.touches` reports zero active
+  // fingers, NO button remains latched. This kills the last possible
+  // source of the classic "auto-walk" bug on Android — even if a
+  // Pressable somehow drops its onPressOut, the root sweep will clean
+  // it up on the next touch event anywhere on screen.
+  const onAnyTouch = (e: import("react-native").GestureResponderEvent) => {
+    if (disabled) return;
+    const live = e.nativeEvent.touches?.length ?? 0;
+    if (live === 0) {
+      // Any lingering button state must be false.
+      if (stateRef.current.left || stateRef.current.right || stateRef.current.jump) {
+        releaseAll();
+      }
+    }
+  };
+
   if (oneThumb) {
     // Compact single-thumb layout: JUMP on top, LEFT/RIGHT below — all in
     // the bottom-left corner, sized so a single thumb can reach every
     // button without sliding. Mimics a Game Boy style D-pad + face button.
     return (
-      <View style={[styles.root, { opacity: alpha }]} pointerEvents="box-none">
+      <View
+        style={[styles.root, { opacity: alpha }]}
+        pointerEvents="box-none"
+        onTouchStart={onAnyTouch}
+        onTouchMove={onAnyTouch}
+        onTouchEnd={onAnyTouch}
+        onTouchCancel={onAnyTouch}
+      >
         <View style={styles.oneThumbCluster} pointerEvents="box-none">
           {/* Top row: JUMP centred over the D-pad */}
           <Pressable
@@ -171,7 +198,14 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   }
 
   return (
-    <View style={[styles.root, { opacity: alpha }]} pointerEvents="box-none">
+    <View
+      style={[styles.root, { opacity: alpha }]}
+      pointerEvents="box-none"
+      onTouchStart={onAnyTouch}
+      onTouchMove={onAnyTouch}
+      onTouchEnd={onAnyTouch}
+      onTouchCancel={onAnyTouch}
+    >
       <View style={styles.leftCluster} pointerEvents="box-none">
         <Pressable
           testID="btn-left"
