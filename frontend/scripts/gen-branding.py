@@ -327,6 +327,280 @@ def make_promo_banner():
     return img
 
 
+# ==========================================================================
+# Tablet screenshots (Google Play requires at least 1 image each for 7-inch
+# and 10-inch tablets when targeting tablets). Both sizes MUST have the
+# same aspect ratio and long edge ≤ 3840px. We render high-res landscape
+# hero images that combine a mock game scene + tagline + branding — this
+# ensures the store listing looks polished even before you upload real
+# gameplay captures.
+# ==========================================================================
+
+
+def _draw_starfield_bg(img, seed=42, star_count=None, gradient=("dark", "cool")):
+    """Fill `img` with the signature deep-space gradient + parallax stars."""
+    W, H = img.size
+    if star_count is None:
+        star_count = int((W * H) / 6000)
+    px = img.load()
+    for x in range(W):
+        t = x / W
+        r = int(10 + 22 * t)
+        g = int(11 + 15 * t)
+        b = int(16 + 58 * t)
+        for y in range(H):
+            fy = 1 - abs((y / H) - 0.5) * 0.28
+            px[x, y] = (int(r * fy), int(g * fy), int(b * fy), 255)
+    import random
+    random.seed(seed)
+    d = ImageDraw.Draw(img)
+    for _ in range(star_count):
+        sx = random.randint(0, W - 1)
+        sy = random.randint(0, H - 1)
+        rr = random.uniform(0.7, 2.6)
+        a = int(random.uniform(90, 220))
+        hue = random.choice([
+            (255, 255, 255),
+            (0, 229, 255),
+            (178, 102, 255),
+            (180, 200, 255),
+        ])
+        d.ellipse([sx - rr, sy - rr, sx + rr, sy + rr], fill=(*hue, a))
+
+
+def _draw_mock_robot(d, cx, cy, scale=1.0, echo=False, face_right=True):
+    """Vector "robot" character consistent with the in-game Skia render.
+    `echo=True` draws a semi-transparent purple ghost version."""
+    body_main = (240, 245, 255, 255) if not echo else (157, 0, 255, 200)
+    body_shade = (74, 84, 104, 255) if not echo else (90, 0, 128, 200)
+    visor = (0, 229, 255, 255) if not echo else (224, 160, 255, 200)
+    face = 1 if face_right else -1
+
+    def sx(dx):
+        return cx + dx * scale * face
+
+    def sy(dy):
+        return cy + dy * scale
+
+    def rx(a, b):
+        """Return (min, max) after mirror so rectangle coords remain sorted."""
+        pa, pb = sx(a), sx(b)
+        return (min(pa, pb), max(pa, pb))
+
+    # Ambient glow
+    glow_layer = Image.new("RGBA", d._image.size, (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow_layer)
+    x0, x1 = rx(-24, 24)
+    gd.rounded_rectangle(
+        [x0, sy(-32), x1, sy(32)],
+        radius=int(14 * scale),
+        fill=(visor[0], visor[1], visor[2], 60),
+    )
+    glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(radius=8 * scale))
+    d._image.alpha_composite(glow_layer)
+    # Legs
+    d.line([sx(-8), sy(6), sx(-8), sy(24)], fill=body_shade, width=int(4 * scale))
+    d.line([sx(8), sy(6), sx(8), sy(24)], fill=body_shade, width=int(4 * scale))
+    # Body
+    x0, x1 = rx(-14, 14)
+    d.rounded_rectangle(
+        [x0, sy(-10), x1, sy(14)],
+        radius=int(6 * scale),
+        fill=body_main,
+    )
+    # Visor stripe
+    x0, x1 = rx(-12, 12)
+    d.rounded_rectangle(
+        [x0, sy(-8), x1, sy(12)],
+        radius=int(5 * scale),
+        outline=visor,
+        width=max(1, int(1.5 * scale)),
+    )
+    # Head
+    x0, x1 = rx(-8, 8)
+    d.ellipse([x0, sy(-24), x1, sy(-8)], fill=body_main)
+    # Facing-side visor sweep
+    x0, x1 = rx(-3, 9)
+    d.ellipse(
+        [x0, sy(-22), x1, sy(-10)],
+        fill=(visor[0], visor[1], visor[2], 140),
+    )
+    # Eye (facing side)
+    x0, x1 = rx(1, 7)
+    d.rounded_rectangle(
+        [x0, sy(-18), x1, sy(-14)],
+        radius=int(1.5 * scale),
+        fill=(255, 255, 255, 255),
+    )
+    # Antenna
+    d.line([sx(0), sy(-24), sx(3), sy(-32)], fill=visor, width=int(2 * scale))
+    x0, x1 = rx(1.5, 4.5)
+    d.ellipse([x0, sy(-33.5), x1, sy(-30.5)], fill=visor)
+
+
+def _draw_mock_tile_row(d, W, floor_y, tile_size=64, gap=2):
+    """Draw a strip of game floor tiles across the bottom of the scene."""
+    x = 0
+    while x < W:
+        d.rounded_rectangle(
+            [x + gap, floor_y + gap, x + tile_size - gap, floor_y + tile_size - gap],
+            radius=6,
+            fill=(20, 24, 38, 255),
+        )
+        d.rounded_rectangle(
+            [x + gap, floor_y + gap, x + tile_size - gap, floor_y + tile_size - gap],
+            radius=6,
+            outline=(0, 229, 255, 80),
+            width=2,
+        )
+        x += tile_size
+
+
+def _draw_portal(d, cx, cy, r=54, color=CYAN):
+    """Neon portal ring — used as the "goal" marker in mock scenes."""
+    glow = Image.new("RGBA", d._image.size, (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.ellipse([cx - r - 12, cy - r - 12, cx + r + 12, cy + r + 12],
+               outline=(color[0], color[1], color[2], 220), width=8)
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=14))
+    d._image.alpha_composite(glow)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=color, width=6)
+    d.ellipse([cx - r * 0.4, cy - r * 0.4, cx + r * 0.4, cy + r * 0.4], fill=(255, 255, 255, 220))
+
+
+def _draw_spikes(d, x0, y_floor, count=4, size=28):
+    """Row of red spike hazards, cluster placed on the floor."""
+    for i in range(count):
+        x = x0 + i * size
+        d.polygon(
+            [(x, y_floor), (x + size / 2, y_floor - size), (x + size, y_floor)],
+            fill=(255, 0, 60, 255),
+        )
+
+
+def _draw_laser_beam(d, x1, y1, x2, y2, width=8):
+    """Horizontal or vertical laser hazard."""
+    layer = Image.new("RGBA", d._image.size, (0, 0, 0, 0))
+    ld = ImageDraw.Draw(layer)
+    ld.line([x1, y1, x2, y2], fill=(255, 0, 60, 220), width=width + 10)
+    layer = layer.filter(ImageFilter.GaussianBlur(radius=6))
+    d._image.alpha_composite(layer)
+    d.line([x1, y1, x2, y2], fill=(255, 0, 60, 255), width=width)
+
+
+def _draw_hud_pill(d, cx, cy, label, value, color=CYAN, w=220, h=54):
+    """Compact HUD-style pill for the top of the screenshot."""
+    d.rounded_rectangle(
+        [cx - w // 2, cy - h // 2, cx + w // 2, cy + h // 2],
+        radius=h // 2,
+        fill=(22, 24, 36, 220),
+        outline=color,
+        width=2,
+    )
+    font_lbl = _load_font(int(h * 0.28), bold=True)
+    font_val = _load_font(int(h * 0.45), bold=True)
+    d.text((cx - w // 2 + 18, cy - h * 0.42), label, font=font_lbl, fill=(180, 200, 230, 230))
+    d.text((cx - w // 2 + 18, cy - h * 0.08), value, font=font_val, fill=color)
+
+
+def make_tablet_screenshot(W, H, scene_key):
+    """Render a single Play Store tablet screenshot.
+
+    `scene_key` picks one of the four hand-composed scenes so the store
+    can showcase four distinct game moments per tablet size."""
+    img = Image.new("RGBA", (W, H), (10, 11, 16, 255))
+    _draw_starfield_bg(img, seed={"loop": 42, "puzzle": 84, "jump": 121, "laser": 200}[scene_key])
+    d = ImageDraw.Draw(img)
+
+    # Floor row at the bottom quarter
+    tile = int(H * 0.075)
+    floor_y = int(H * 0.78)
+    _draw_mock_tile_row(d, W, floor_y, tile_size=tile)
+
+    # Compose scene-specific gameplay mock
+    center_y = floor_y - int(tile * 0.42)  # feet on tile top
+    robot_scale = H / 350
+
+    if scene_key == "loop":
+        # Player on the right + trailing purple echoes on the left
+        for i, ex in enumerate([W * 0.28, W * 0.42, W * 0.56]):
+            _draw_mock_robot(d, ex, center_y - i * 4, scale=robot_scale * 0.85, echo=True)
+        _draw_mock_robot(d, W * 0.72, center_y, scale=robot_scale)
+        tagline_top = "REWIND TIME"
+        tagline_sub = "Create Echoes. Solve impossible puzzles."
+    elif scene_key == "puzzle":
+        # Player + portal on the right
+        _draw_mock_robot(d, W * 0.30, center_y, scale=robot_scale)
+        _draw_portal(d, W * 0.72, center_y - tile * 0.2, r=int(H * 0.09))
+        tagline_top = "100 HANDCRAFTED PUZZLES"
+        tagline_sub = "8 worlds. Boss battles. No fillers."
+    elif scene_key == "jump":
+        # Player mid-air over spikes
+        _draw_spikes(d, int(W * 0.44), floor_y, count=6, size=int(H * 0.045))
+        # Player rendered ABOVE the floor to imply a jump
+        _draw_mock_robot(d, W * 0.58, center_y - int(H * 0.16), scale=robot_scale)
+        _draw_mock_robot(d, W * 0.30, center_y, scale=robot_scale * 0.8, echo=True)
+        tagline_top = "PRECISION PLATFORMER"
+        tagline_sub = "Deterministic physics. 60 FPS. No luck."
+    else:  # laser
+        # Player dodging a laser beam
+        _draw_laser_beam(d, int(W * 0.08), floor_y - int(H * 0.10),
+                         int(W * 0.92), floor_y - int(H * 0.10),
+                         width=int(H * 0.014))
+        _draw_mock_robot(d, W * 0.28, center_y, scale=robot_scale)
+        _draw_mock_robot(d, W * 0.72, center_y, scale=robot_scale, face_right=False)
+        tagline_top = "8 WORLDS OF CHAOS"
+        tagline_sub = "Lasers. Portals. Gravity flips. Time doors."
+
+    # ----- Title banner + branding -----
+    d.rectangle([0, 0, W, int(H * 0.32)], fill=(10, 11, 16, 180))
+
+    # Top-left mini glyph
+    gsz = int(H * 0.16)
+    glyph = draw_loop_glyph(gsz, transparent_bg=True, glow_boost=1.2)
+    img.alpha_composite(glyph, (int(W * 0.03), int(H * 0.04)))
+
+    # TIME LOOP ESCAPE wordmark
+    wm_font = _load_font(int(H * 0.075), bold=True)
+    sub_font = _load_font(int(H * 0.025), bold=True)
+    d.text((int(W * 0.03) + gsz + 20, int(H * 0.06)), "TIME LOOP", font=wm_font,
+           fill=(255, 255, 255, 245))
+    d.text((int(W * 0.03) + gsz + 20, int(H * 0.06) + int(H * 0.075)), "ESCAPE",
+           font=wm_font, fill=CYAN)
+    d.text((int(W * 0.03) + gsz + 22, int(H * 0.06) + int(H * 0.16)),
+           "A neon puzzle platformer", font=sub_font, fill=(150, 165, 195, 230))
+
+    # HUD pills (top-right) — Timer + Echoes
+    _draw_hud_pill(d, int(W * 0.82), int(H * 0.10), "TIME", "7.42s", color=CYAN,
+                   w=int(W * 0.15), h=int(H * 0.08))
+    _draw_hud_pill(d, int(W * 0.82), int(H * 0.22), "ECHO", "2/5", color=PURPLE,
+                   w=int(W * 0.15), h=int(H * 0.08))
+
+    # ----- Centre feature tagline -----
+    tag_font = _load_font(int(H * 0.11), bold=True)
+    sub_tag_font = _load_font(int(H * 0.033), bold=True)
+
+    # Measure to centre.
+    def _text_w(s, font):
+        try:
+            return d.textbbox((0, 0), s, font=font)[2]
+        except Exception:
+            return len(s) * font.size // 2
+
+    tag_w = _text_w(tagline_top, tag_font)
+    d.text(((W - tag_w) // 2, int(H * 0.40)), tagline_top, font=tag_font,
+           fill=(255, 255, 255, 255))
+    sub_w = _text_w(tagline_sub, sub_tag_font)
+    d.text(((W - sub_w) // 2, int(H * 0.52)), tagline_sub, font=sub_tag_font,
+           fill=CYAN)
+
+    # Cyan accent bars top & bottom for a polished neon frame
+    d.rectangle([0, 0, W, 4], fill=CYAN)
+    d.rectangle([0, H - 5, W, H], fill=CYAN)
+
+    return img
+
+
 # ---------- main ----------
 
 if __name__ == "__main__":
@@ -353,4 +627,19 @@ if __name__ == "__main__":
     make_icon().resize((512, 512), Image.LANCZOS).save(
         f"{store_dir}/icon-512.png", "PNG", optimize=True
     )
+
+    # ---- Tablet screenshots ----
+    # Play Store spec: 320px min, 3840px max side; 16:9 to 9:16 aspect.
+    # We use 1920x1080 (7-inch, landscape) and 2732x2048 (10-inch, landscape)
+    # which are the two ratios Google explicitly recommends for tablets.
+    scenes = ["loop", "puzzle", "jump", "laser"]
+    sizes = {"7in": (1920, 1080), "10in": (2732, 2048)}
+    ss_dir = f"{store_dir}/screenshots"
+    os.makedirs(ss_dir, exist_ok=True)
+    for label, (w, h) in sizes.items():
+        for idx, scene in enumerate(scenes, start=1):
+            out_path = f"{ss_dir}/tablet-{label}-{idx:02d}-{scene}.png"
+            print(f"Generating {out_path} ({w}x{h})…")
+            im = make_tablet_screenshot(w, h, scene)
+            im.convert("RGB").save(out_path, "PNG", optimize=True)
     print("Done.")
