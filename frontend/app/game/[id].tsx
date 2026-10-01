@@ -24,6 +24,8 @@ import { bumpDeathStat, bumpPlaytime, getCachedSave, recordLevelResult } from "@
 import { playCue } from "@/src/game/audio";
 import { haptic } from "@/src/game/haptics";
 import { spawnBurst } from "@/src/game/particles";
+import { onLevelCompleted as adsOnLevelCompleted } from "@/src/ads/interstitial";
+import { showRewarded } from "@/src/ads/rewarded";
 
 // Lazy-load the Skia renderer so its top-level Skia code doesn't run until
 // CanvasKit is ready (see _layout.tsx LoadSkiaWeb).
@@ -239,6 +241,9 @@ export default function GameScreen() {
           setOutcome({ kind: "won", loops: s.loop, grade, stars });
           recordLevelResult(s.level.id, s.loop, grade, stars, clearMs).catch(() => {});
           bumpPlaytime(clearMs).catch(() => {});
+          // Trigger interstitial cadence (every 3-5 completed levels).
+          // Non-blocking — failures silently abandon the ad.
+          try { adsOnLevelCompleted(); } catch {}
           playCue("win");
           haptic("win");
           // Confetti-ish victory burst at the player's location.
@@ -446,8 +451,11 @@ function OutcomeOverlay({
 }) {
   // Staggered star reveal — count-up animation.
   const [starsShown, setStarsShown] = useState(0);
+  const [adBusy, setAdBusy] = useState(false);
+  const [adUsedThisDeath, setAdUsedThisDeath] = useState(false);
   useEffect(() => {
     setStarsShown(0);
+    setAdUsedThisDeath(false);
     if (!outcome || outcome.kind !== "won") return;
     const target = outcome.stars ?? 0;
     let cancelled = false;
@@ -506,7 +514,36 @@ function OutcomeOverlay({
               <Pressable testID="btn-next" onPress={onNext} style={({ pressed }) => [styles.oBtn, styles.oPrimary, pressed && styles.pressed]}>
                 <Text style={styles.oLabel}>NEXT</Text>
               </Pressable>
-            ) : null}
+            ) : (
+              // Rewarded-ad continue — only on death, once per death, never
+              // force-blocks. If ad is unavailable, player retries normally.
+              !adUsedThisDeath ? (
+                <Pressable
+                  testID="btn-watch-ad"
+                  disabled={adBusy}
+                  onPress={() => {
+                    if (adBusy) return;
+                    setAdBusy(true);
+                    playCue("ui_tap");
+                    showRewarded(
+                      "continue",
+                      () => {
+                        setAdBusy(false);
+                        setAdUsedThisDeath(true);
+                        onRetry();
+                      },
+                      () => {
+                        setAdBusy(false);
+                        setAdUsedThisDeath(true);
+                      },
+                    );
+                  }}
+                  style={({ pressed }) => [styles.oBtn, styles.oPrimary, pressed && styles.pressed, adBusy && styles.pressed]}
+                >
+                  <Text style={styles.oLabel}>{adBusy ? "LOADING…" : "▶ WATCH AD"}</Text>
+                </Pressable>
+              ) : null
+            )}
             <Pressable testID="btn-retry-outcome" onPress={onRetry} style={({ pressed }) => [styles.oBtn, pressed && styles.pressed]}>
               <Text style={styles.oLabel}>RETRY</Text>
             </Pressable>

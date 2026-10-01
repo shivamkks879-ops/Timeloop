@@ -11,6 +11,7 @@ import { COLORS } from "@/src/game/constants";
 import { LEVELS } from "@/src/game/levels";
 import { getCachedSave, isLevelUnlocked, loadSave } from "@/src/game/save";
 import type { LevelDef } from "@/src/game/types";
+import { MenuBanner } from "@/src/ads/MenuBanner";
 
 const WORLD_NAMES: Record<number, string> = {
   1: "LEARNING TIME",
@@ -114,6 +115,7 @@ export default function LevelSelect() {
             </View>
           ))}
         </ScrollView>
+        <MenuBanner />
       </SafeAreaView>
     </View>
   );

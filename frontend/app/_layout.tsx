@@ -12,6 +12,7 @@ import { initAudio, setMusicEnabled, setSfxEnabled, startMusic } from "@/src/gam
 import { loadSave } from "@/src/game/save";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { loadSkiaForPlatform } from "@/src/utils/load-skia-web";
+import { startAds } from "@/src/ads/bootstrap";
 
 // Silence dev logbox overlays so the game canvas stays clean.
 LogBox.ignoreAllLogs(true);
@@ -31,6 +32,13 @@ export default function RootLayout() {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(
       () => {}
     );
+  }, []);
+
+  // Bootstrap AdMob + UMP consent in the background. Fire-and-forget —
+  // the game stays fully playable even if the user denies consent or
+  // the SDK fails to initialise.
+  useEffect(() => {
+    void startAds();
   }, []);
 
   // Load CanvasKit WASM on web before mounting Skia components.

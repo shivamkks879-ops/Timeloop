@@ -2,7 +2,7 @@
   "expo": {
     "name": "Time Loop Escape",
     "slug": "time-loop-escape",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "timeloopescape",
@@ -39,6 +39,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.timeloopscope.game",
+      "versionCode": 3,
       "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
@@ -51,6 +52,24 @@
       "expo-router",
       "expo-audio",
       [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "delayAppMeasurementInit": true,
+          "optimizeInitialization": true,
+          "optimizeAdLoading": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "-keep class com.google.android.gms.internal.consent_sdk.** { *; }"
+          }
+        }
+      ],
+      [
         "expo-navigation-bar",
         {
           "position": "absolute",
@@ -61,7 +80,9 @@
       ],
       [
         "expo-screen-orientation",
-        { "initialOrientation": "LANDSCAPE" }
+        {
+          "initialOrientation": "LANDSCAPE"
+        }
       ],
       [
         "expo-splash-screen",
@@ -78,7 +99,9 @@
       ],
       [
         "expo-system-ui",
-        { "userInterfaceStyle": "dark" }
+        {
+          "userInterfaceStyle": "dark"
+        }
       ]
     ],
     "experiments": {
