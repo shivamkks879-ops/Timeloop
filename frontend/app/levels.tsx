@@ -8,6 +8,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { playCue } from "@/src/game/audio";
 import { COLORS } from "@/src/game/constants";
+import { difficultyLabel, difficultyTier, maxStarsForLevel } from "@/src/game/engine";
 import { LEVELS } from "@/src/game/levels";
 import { getCachedSave, isLevelUnlocked, loadSave } from "@/src/game/save";
 import type { LevelDef } from "@/src/game/types";
@@ -77,6 +78,13 @@ export default function LevelSelect() {
                   const unlocked = isLevelUnlocked(save, l.id);
                   const entry = save.levels[l.id];
                   const stars = entry?.stars ?? 0;
+                  // Difficulty-aware star rendering — tier-3 (boss) levels
+                  // can earn up to 5 stars, tier-2 up to 4, tier-1 up to 3.
+                  // Players SEE how much is at stake before they tap in.
+                  const maxStars = maxStarsForLevel(l);
+                  const tier = difficultyTier(l);
+                  const diffColor =
+                    tier === 3 ? COLORS.purple : tier === 2 ? COLORS.cyan : COLORS.textMuted;
                   return (
                     <Pressable
                       key={l.id}
@@ -89,19 +97,31 @@ export default function LevelSelect() {
                         pressed && styles.pressed,
                       ]}
                     >
-                      <Text style={[styles.cardId, !unlocked && styles.cardDimText]}>
-                        {l.id}
-                      </Text>
+                      <View style={styles.cardTopRow}>
+                        <Text style={[styles.cardId, !unlocked && styles.cardDimText]}>
+                          {l.id}
+                        </Text>
+                        {unlocked ? (
+                          <View style={[styles.diffBadge, { borderColor: diffColor }]}>
+                            <Text style={[styles.diffBadgeTxt, { color: diffColor }]}>
+                              {difficultyLabel(l).toUpperCase()}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
                       <Text style={[styles.cardName, !unlocked && styles.cardDimText]}>
                         {unlocked ? l.name : "LOCKED"}
                       </Text>
                       <View style={styles.stars}>
-                        {[0, 1, 2].map((i) => (
+                        {Array.from({ length: maxStars }, (_, i) => (
                           <Text
                             key={i}
                             style={[
                               styles.star,
                               i < stars ? styles.starFilled : styles.starEmpty,
+                              // Shrink star size a bit when there are 5 so
+                              // they still fit on a small level card.
+                              maxStars >= 5 ? styles.starSmall : null,
                             ]}
                           >
                             {"\u2605"}
@@ -212,10 +232,14 @@ const styles = StyleSheet.create({
   },
   stars: {
     flexDirection: "row",
-    gap: 4,
+    gap: 3,
+    flexWrap: "wrap",
   },
   star: {
     fontSize: 14,
+  },
+  starSmall: {
+    fontSize: 11,
   },
   starFilled: {
     color: COLORS.green,
@@ -224,6 +248,23 @@ const styles = StyleSheet.create({
   },
   starEmpty: {
     color: COLORS.textMuted,
+  },
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  diffBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  diffBadgeTxt: {
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1.2,
   },
   pressed: { opacity: 0.7 },
 });

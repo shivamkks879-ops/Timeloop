@@ -53,6 +53,16 @@ export interface EngineState {
   sentries: SentryState[];
   bossPressed: Set<string>;         // persistent boss plates across all loops
   totalBossPlates: number;          // total number of B plates originally in the level
+  // Transient death FX — set the instant the player (or any echo) dies.
+  // Renderer reads this and spawns a short electric burst + screen flash.
+  // Cleared automatically when `fxTicksLeft` reaches 0.
+  deathFx: {
+    x: number;         // centre x of the burst (pixels)
+    y: number;         // centre y of the burst (pixels)
+    cause: "beam" | "sentry" | "hazard";
+    fxTicksLeft: number; // decremented each step; renderer fades proportional to this
+    isPlayer: boolean; // true = player death → stronger flash; false = echo
+  } | null;
 }
 
 // Player AABB (slightly smaller than a tile so wall play feels forgiving)
@@ -141,6 +151,7 @@ export function initEngine(level: LevelDef): EngineState {
     sentries: (level.sentries ?? []).map(makeSentryState),
     bossPressed: new Set(),
     totalBossPlates,
+    deathFx: null,
   };
 }
 
@@ -691,11 +702,35 @@ export function step(state: EngineState, playerInput: number): EngineState {
   state.platesPressed = computePlates(state);
   state.beams = computeBeams(state);
 
-  // Deaths: hazards + laser hits + sentries.
+  // Decrement any lingering death FX from a previous tick so the renderer
+  // can fade the burst out smoothly. Max life = 24 ticks (~0.4s @ 60 TPS).
+  if (state.deathFx && state.deathFx.fxTicksLeft > 0) {
+    state.deathFx.fxTicksLeft -= 1;
+    if (state.deathFx.fxTicksLeft <= 0) state.deathFx = null;
+  }
+
+  // Deaths: hazards + laser hits + sentries. We record the CAUSE and
+  // position of the player's death so the renderer can play an electric
+  // burst + screen flash — vital so players understand *why* they died.
   const allActors: Actor[] = [state.player, ...state.echoes];
   for (const a of allActors) {
     if (!a.alive) continue;
-    if (touchesHazard(state, a)) { a.alive = false; continue; }
+    const isPlayer = a === state.player;
+    if (touchesHazard(state, a)) {
+      a.alive = false;
+      // Only overwrite FX on *player* death — echo deaths are less
+      // dramatic and shouldn't flash the screen.
+      if (isPlayer) {
+        state.deathFx = {
+          x: a.x + PLAYER_W / 2,
+          y: a.y + PLAYER_H / 2,
+          cause: "hazard",
+          fxTicksLeft: 24,
+          isPlayer: true,
+        };
+      }
+      continue;
+    }
     // Killed by beam if we're in the beam segment OR we are the terminator.
     let killed = false;
     for (const b of state.beams) {
@@ -703,10 +738,33 @@ export function step(state: EngineState, playerInput: number): EngineState {
       const { bx, by, bw, bh } = beamAABB(b);
       if (aabbOverlap(a.x, a.y, PLAYER_W, PLAYER_H, bx, by, bw, bh)) { a.alive = false; killed = true; break; }
     }
-    if (killed) continue;
+    if (killed) {
+      if (isPlayer) {
+        state.deathFx = {
+          x: a.x + PLAYER_W / 2,
+          y: a.y + PLAYER_H / 2,
+          cause: "beam",
+          fxTicksLeft: 24,
+          isPlayer: true,
+        };
+      }
+      continue;
+    }
     // Killed by an active sentry (only alive/moving sentries kill; stalled ones still kill on contact).
     for (const s of state.sentries) {
-      if (sentryTouches(a, s)) { a.alive = false; break; }
+      if (sentryTouches(a, s)) {
+        a.alive = false;
+        if (isPlayer) {
+          state.deathFx = {
+            x: a.x + PLAYER_W / 2,
+            y: a.y + PLAYER_H / 2,
+            cause: "sentry",
+            fxTicksLeft: 24,
+            isPlayer: true,
+          };
+        }
+        break;
+      }
     }
   }
 
@@ -751,6 +809,61 @@ export function computeGrade(
   return "C";
 }
 
-export function gradeToStars(g: "S" | "A" | "B" | "C"): number {
-  return g === "S" ? 3 : g === "A" ? 2 : 1;
+/**
+ * Difficulty tier derived from the level's world. Worlds 1-4 are
+ * tutorials & medium, worlds 5-6 introduce complex mechanics, 7-8 are
+ * advanced/boss arenas. We use this to scale the star reward so beating
+ * a world-8 boss feels more rewarding than clearing world-1-1.
+ *
+ *   Tier 1 → max 3 stars (easy)
+ *   Tier 2 → max 4 stars (medium / hard)
+ *   Tier 3 → max 5 stars (advanced / boss)
+ */
+export function difficultyTier(level: LevelDef): 1 | 2 | 3 {
+  if (level.world >= 7) return 3;
+  if (level.world >= 5) return 2;
+  return 1;
 }
+
+/**
+ * Maximum stars any player can earn on a given level — depends on tier.
+ * Used by the Level Select UI to render the correct number of star slots.
+ */
+export function maxStarsForLevel(level: LevelDef): number {
+  const t = difficultyTier(level);
+  return t === 3 ? 5 : t === 2 ? 4 : 3;
+}
+
+/**
+ * Convert a grade to the EARNED stars count for a specific level.
+ *
+ *   Base (grade→stars):   S=3  A=2  B=1  C=0
+ *   Bonus from tier:      +1 star if tier ≥ 2,  +1 more if tier = 3
+ *
+ * So on a world-8 boss (tier 3) a perfect S-grade awards 5 stars; on a
+ * world-1 beginner level (tier 1) the same perfect run awards 3 stars.
+ * Clamped to each level's maxStars so the UI never overflows.
+ */
+export function gradeToStars(g: "S" | "A" | "B" | "C", level?: LevelDef): number {
+  const base = g === "S" ? 3 : g === "A" ? 2 : g === "B" ? 1 : 0;
+  if (!level) return Math.max(1, base);
+  const t = difficultyTier(level);
+  const bonus = t === 3 ? 2 : t === 2 ? 1 : 0;
+  const max = maxStarsForLevel(level);
+  // At least 1 star for any completion — losing C-grade on tier-3 would
+  // otherwise give 0+2 = 2, which is fine, but we keep the min guard
+  // for safety in case grade thresholds get re-tuned later.
+  return Math.min(max, Math.max(1, base + bonus));
+}
+
+/**
+ * Human-readable difficulty label for the level-select UI.
+ * Keep words short — levels cards are tight on space on mobile.
+ */
+export function difficultyLabel(level: LevelDef): "Easy" | "Medium" | "Hard" | "Boss" {
+  if (level.world >= 7) return level.world === 8 ? "Boss" : "Hard";
+  if (level.world >= 5) return "Hard";
+  if (level.world >= 3) return "Medium";
+  return "Easy";
+}
+

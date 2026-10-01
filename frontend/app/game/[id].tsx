@@ -13,6 +13,7 @@ import {
   encodeInput,
   gradeToStars,
   initEngine,
+  maxStarsForLevel,
   resetLevel,
   step,
   timeRemaining,
@@ -236,7 +237,7 @@ export default function GameScreen() {
         const s = stateRef.current;
         if (s && s.status === "won" && !outcome) {
           const grade = computeGrade(s.level, s.loop);
-          const stars = gradeToStars(grade);
+          const stars = gradeToStars(grade, s.level);
           const clearMs = Date.now() - levelStartRef.current;
           setOutcome({ kind: "won", loops: s.loop, grade, stars });
           recordLevelResult(s.level.id, s.loop, grade, stars, clearMs).catch(() => {});
@@ -385,6 +386,7 @@ export default function GameScreen() {
       <OutcomeOverlay
         outcome={outcome}
         parEchoes={level.parEchoes}
+        maxStars={maxStarsForLevel(level)}
         onRetry={() => { playCue("ui_tap"); doRetry(); }}
         onNext={() => { playCue("ui_tap"); doNext(); }}
         onQuit={() => { playCue("ui_tap"); doQuit(); }}
@@ -439,12 +441,14 @@ function PauseOverlay({
 function OutcomeOverlay({
   outcome,
   parEchoes,
+  maxStars,
   onRetry,
   onNext,
   onQuit,
 }: {
   outcome: { kind: "won" | "dead"; loops: number; grade?: "S" | "A" | "B" | "C"; stars?: number } | null;
   parEchoes: number;
+  maxStars: number;
   onRetry: () => void;
   onNext: () => void;
   onQuit: () => void;
@@ -487,7 +491,7 @@ function OutcomeOverlay({
               <View style={styles.gradeRow}>
                 <Text style={styles.gradeLetter}>{outcome.grade}</Text>
                 <View style={styles.starsBig}>
-                  {[0, 1, 2].map((i) => {
+                  {Array.from({ length: Math.max(3, maxStars) }, (_, i) => {
                     const lit = i < starsShown;
                     return (
                       <Text
@@ -495,6 +499,8 @@ function OutcomeOverlay({
                         style={[
                           styles.starBig,
                           lit ? styles.starLit : styles.starDim,
+                          // Shrink a bit for 4-5 star layouts so they still fit.
+                          maxStars >= 5 ? { fontSize: 32 } : maxStars === 4 ? { fontSize: 36 } : null,
                           { transform: [{ scale: lit ? 1.05 : 0.85 }] },
                         ]}
                       >

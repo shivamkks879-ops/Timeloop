@@ -596,7 +596,7 @@ export function playtestLevel(level: LevelDef, script: InputSegment[]): Playtest
           loopsUsed: state.loop + 1,
           echoesUsed: state.loop,
           grade,
-          stars: gradeToStars(grade),
+          stars: gradeToStars(grade, state.level),
           finalPlayerX: state.player.x,
           finalPlayerY: state.player.y,
         };
