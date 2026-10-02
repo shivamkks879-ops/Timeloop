@@ -675,6 +675,12 @@ export const LEVELS: LevelDef[] = [
       "########^^^^^^##########",
       "########################",
     ],
+    sentries: [
+      // Drone patrol sweeping the upper ceiling over the portal — the
+      // player can't touch it from the floor, but it's visible and
+      // telegraphs that these things exist ahead.
+      { id: "d1", x0: 5, y0: 2, x1: 16, y1: 2, speed: 0.9 },
+    ],
   },
   {
     id: "5-4", world: 5, name: "Long Warp",
@@ -688,6 +694,11 @@ export const LEVELS: LevelDef[] = [
       "S..1................2..G",
       "########################",
       "########################",
+    ],
+    sentries: [
+      // Drone patrolling the upper ceiling — visible threat while the
+      // player warps along the bottom row.
+      { id: "d1", x0: 6, y0: 3, x1: 17, y1: 3, speed: 1.1 },
     ],
   },
   {
@@ -930,6 +941,13 @@ export const LEVELS: LevelDef[] = [
       "########^^^^^^^^^^^^####",
       "########################",
     ],
+    sentries: [
+      // Drone patrolling the mid-air lane between the two gravity flippers
+      // — shifted right of the left flipper's rise lane so the player
+      // flipping up at col 3 doesn't clip the drone's underside. The
+      // ceiling walk passes ~39px above the drone.
+      { id: "d1", x0: 8, y0: 3, x1: 17, y1: 3, speed: 1.0 },
+    ],
   },
   {
     id: "6-12", world: 6, name: "Vault Master",
@@ -1016,6 +1034,12 @@ export const LEVELS: LevelDef[] = [
       "S...............D.....G.",
       "###P####################", "########################",
     ],
+    sentries: [
+      // Vertical drone patrolling the column left of the door — blocks
+      // the direct ground path so the player must go around via the
+      // plate-triggered door, or time their approach.
+      { id: "d1", x0: 7, y0: 2, x1: 7, y1: 6, speed: 0.8 },
+    ],
   },
   {
     id: "7-4", world: 7, name: "Warp Collapse",
@@ -1068,6 +1092,11 @@ export const LEVELS: LevelDef[] = [
       "S..~..................G.",
       "########^^^^^^^^^^^^####",
       "########################",
+    ],
+    sentries: [
+      // Drone patrolling the ceiling road — the signature Warden-7 style.
+      // Starts at col 8 so the left-flipper rise lane (cols 3-5) stays clear.
+      { id: "d1", x0: 8, y0: 3, x1: 18, y1: 3, speed: 1.2 },
     ],
   },
   {

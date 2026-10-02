@@ -249,27 +249,70 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
     </Group>
   ));
 
-  const sentryNodes = state.sentries.map((s) => (
-    <Group key={`sn${s.def.id}`}>
-      {/* Danger glow */}
-      <RoundedRect x={s.px - 3} y={s.py - 3} width={26 + 6} height={26 + 6} r={10} color={COLORS.red} opacity={s.stalled ? 0.22 : 0.4}>
-        <Blur blur={s.stalled ? 4 : 7} />
-      </RoundedRect>
-      {/* Hull */}
-      <RoundedRect x={s.px} y={s.py} width={26} height={26} r={6} color={s.stalled ? "#3A1620" : "#5A1830"} />
-      <RoundedRect x={s.px} y={s.py} width={26} height={26} r={6} color={COLORS.red} style="stroke" strokeWidth={1.5} opacity={0.9} />
-      {/* Eye (facing toward motion dir) */}
-      <Circle
-        cx={s.px + 13 + (s.dir > 0 ? 4 : -4)}
-        cy={s.py + 13}
-        r={3}
-        color={s.stalled ? COLORS.textMuted : COLORS.red}
-      >
-        <Blur blur={2} />
-      </Circle>
-      <Circle cx={s.px + 13} cy={s.py + 13} r={1.5} color={COLORS.white} opacity={0.9} />
-    </Group>
-  ));
+  const sentryNodes = state.sentries.map((s) => {
+    // Drone styling: hover disc + spin blades + cyan scanner beam.
+    // The visual swap makes the enemy read as a futuristic patrol drone
+    // rather than a boxy sentinel — important for the "sci-fi time-loop"
+    // identity.
+    const rotorFrame = animFrame % 8; // 8-frame rotor cycle
+    const rotorSpan = 5 + Math.sin((animFrame / 4) * Math.PI) * 1.5;
+    const scannerVisible = !s.stalled && rotorFrame % 4 === 0;
+    return (
+      <Group key={`sn${s.def.id}`}>
+        {/* Hover glow under the body */}
+        <RoundedRect x={s.px - 2} y={s.py + 22} width={30} height={4} r={2} color={COLORS.cyan} opacity={0.35}>
+          <Blur blur={3} />
+        </RoundedRect>
+
+        {/* Rotor blades (animated "spinning" via alternating spans) */}
+        <Rect
+          x={s.px + 13 - rotorSpan / 2}
+          y={s.py - 3}
+          width={rotorSpan}
+          height={2}
+          color={COLORS.cyan}
+          opacity={0.8}
+        />
+        <Rect
+          x={s.px + 13 - (8 - rotorSpan) / 2}
+          y={s.py - 3}
+          width={8 - rotorSpan}
+          height={1.5}
+          color={COLORS.cyan}
+          opacity={0.5}
+        />
+        {/* Rotor shaft */}
+        <Rect x={s.px + 12} y={s.py - 3} width={2} height={3} color={COLORS.textMuted} />
+
+        {/* Body: a floating disc rather than a box */}
+        <RoundedRect x={s.px} y={s.py} width={26} height={22} r={11} color={s.stalled ? "#1A3A4A" : "#0D2A3A"} />
+        <RoundedRect x={s.px} y={s.py} width={26} height={22} r={11} color={COLORS.cyan} style="stroke" strokeWidth={1.5} opacity={0.9} />
+
+        {/* Scanner eye (pulsing cyan dot) — faces motion dir */}
+        <Circle
+          cx={s.px + 13 + (s.dir > 0 ? 4 : -4)}
+          cy={s.py + 11}
+          r={3}
+          color={s.stalled ? COLORS.textMuted : COLORS.cyan}
+        >
+          <Blur blur={2.5} />
+        </Circle>
+        <Circle cx={s.px + 13} cy={s.py + 11} r={1.5} color={COLORS.white} opacity={0.9} />
+
+        {/* Scanner beam — brief cone under the drone, only when patrolling.
+            Two thin triangles flicker every 4th frame for a sci-fi sweep. */}
+        {scannerVisible ? (
+          <Path
+            path={`M ${s.px + 8} ${s.py + 22} L ${s.px + 18} ${s.py + 22} L ${s.px + 22} ${s.py + 36} L ${s.px + 4} ${s.py + 36} Z`}
+            color={COLORS.cyan}
+            opacity={0.18}
+          >
+            <Blur blur={2} />
+          </Path>
+        ) : null}
+      </Group>
+    );
+  });
 
   const beamNodes = state.beams.map((b, i) => {
     const isVertical = b.x1 === b.x2;
@@ -364,7 +407,96 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         {echoes}
         <RobotSprite actor={state.player} frame={animFrame} pose={playerPose} />
         {particleNodes}
+
+        {/* ─── Electric death FX ──────────────────────────────────────
+            Rendered last in world space so the burst sits ON TOP of
+            everything except the player sprite itself. Only drawn while
+            `state.deathFx.fxTicksLeft > 0` (24 ticks ≈ 0.4 s). Cause
+            decides colour: beam = cyan (laser zap), sentry = cyan (drone
+            contact), hazard = red (spikes). */}
+        {state.deathFx && state.deathFx.fxTicksLeft > 0 ? (() => {
+          const fx = state.deathFx!;
+          const t = fx.fxTicksLeft / 24;            // 1 → 0
+          const burstR = 8 + (1 - t) * 26;          // expanding ring
+          const innerR = 5 + (1 - t) * 16;
+          const boltCol = fx.cause === "hazard" ? COLORS.red : COLORS.cyan;
+          const spikeCount = 6;
+          // Deterministic pseudo-random per-burst offsets for the spikes.
+          const spikeSeed = fx.x * 7 + fx.y * 11;
+          const spikes = [];
+          for (let i = 0; i < spikeCount; i++) {
+            const ang = ((i * Math.PI * 2) / spikeCount) + ((spikeSeed + i * 13) % 7) * 0.2;
+            const len = 8 + (1 - t) * (12 + ((spikeSeed + i * 17) % 5) * 2);
+            const cx = fx.x + Math.cos(ang) * (innerR + 2);
+            const cy = fx.y + Math.sin(ang) * (innerR + 2);
+            const tx = fx.x + Math.cos(ang) * (innerR + 2 + len);
+            const ty = fx.y + Math.sin(ang) * (innerR + 2 + len);
+            spikes.push(
+              <Path
+                key={i}
+                path={`M ${cx} ${cy} L ${tx} ${ty}`}
+                color={boltCol}
+                style="stroke"
+                strokeWidth={1.6}
+                strokeCap="round"
+                opacity={0.85 * t}
+              >
+                <Blur blur={1.2} />
+              </Path>,
+            );
+          }
+          return (
+            <Group>
+              {/* Central glow */}
+              <Circle cx={fx.x} cy={fx.y} r={innerR} color={boltCol} opacity={0.55 * t}>
+                <Blur blur={4} />
+              </Circle>
+              {/* Shock ring */}
+              <Circle
+                cx={fx.x}
+                cy={fx.y}
+                r={burstR}
+                color={boltCol}
+                style="stroke"
+                strokeWidth={2.5}
+                opacity={0.75 * t}
+              >
+                <Blur blur={2} />
+              </Circle>
+              {/* Inner ring */}
+              <Circle
+                cx={fx.x}
+                cy={fx.y}
+                r={innerR * 0.6}
+                color={COLORS.white}
+                style="stroke"
+                strokeWidth={1.2}
+                opacity={0.6 * t}
+              />
+              {/* Radiating spikes (electric arcs) */}
+              {spikes}
+              {/* Impact point flash */}
+              <Circle cx={fx.x} cy={fx.y} r={3 + (1 - t) * 2} color={COLORS.white} opacity={0.95 * t} />
+            </Group>
+          );
+        })() : null}
       </Group>
+
+      {/* Screen flash — a translucent white overlay across the whole
+          viewport (NOT the world coords) that fades out over the first
+          few ticks. Only on player death; echo deaths are quieter. */}
+      {state.deathFx && state.deathFx.isPlayer && state.deathFx.fxTicksLeft > 0 ? (
+        <Rect
+          x={0}
+          y={0}
+          width={width}
+          height={height}
+          color="#FFFFFF"
+          // Slightly stronger flash than the old 0.45 — deaths must be
+          // unmistakable on a bright AMOLED in daylight.
+          opacity={0.62 * (state.deathFx.fxTicksLeft / 24)}
+        />
+      ) : null}
     </Canvas>
   );
 }
