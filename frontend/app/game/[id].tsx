@@ -183,14 +183,20 @@ export default function GameScreen() {
               gravity: 0,
             });
           }
-          // Laser mid-loop death (before overall status changes).
+          // Mid-loop death (before overall status changes). Pick the SFX
+          // from the engine-recorded cause so the audio matches what the
+          // player SEES: beam/sentry → electric "zap", hazard/spikes →
+          // the classic "laser" hiss.
           if (p.alive && !cur.player.alive && cur.status === "playing") {
-            playCue("laser");
+            const cause = cur.deathFx?.cause;
+            playCue(cause === "beam" || cause === "sentry" ? "zap" : "laser");
             haptic("laser");
             spawnBurst({
               x: cur.player.x + 11,
               y: cur.player.y + 14,
-              color: "rgba(255, 0, 60, 0.95)",
+              // Cyan burst for electric causes, red for hazards — matches
+              // the renderer's death-FX colour coding.
+              color: cause === "hazard" ? "rgba(255, 0, 60, 0.95)" : "rgba(0, 229, 255, 0.95)",
               count: 12,
               speed: 4.2,
               life: 620,

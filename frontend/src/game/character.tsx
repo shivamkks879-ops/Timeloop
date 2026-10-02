@@ -69,6 +69,9 @@ interface Props {
   pose: Pose;
   echo?: boolean;
   echoAlive?: boolean;
+  /** Fraction of loop time remaining (1 → 0). Drives the Time Core pulse
+   *  speed: the core beats faster as the loop runs out. Echoes omit it. */
+  timeFrac?: number;
 }
 
 // Convenient tint palette.
@@ -79,11 +82,20 @@ const ECHO_DARK = "#5A0080";
 const RED = COLORS.red;
 
 /**
- * Draw the robot centred on its bounding box (x,y) → (x+w, y+h).
- * When gravity flips (`actor.gravityDir === -1`) we mirror vertically so the
- * character stands on the "ceiling".
+ * Draw the hybrid android ("exo-suit runner") centred on its bounding box
+ * (x,y) → (x+w, y+h). When gravity flips (`actor.gravityDir === -1`) we
+ * mirror vertically so the character stands on the "ceiling".
+ *
+ * Design (Option 3 — Hybrid):
+ *   • Dark tactical exo-suit body with cyan Tron-style energy seams
+ *   • Segmented armor chest plate + shoulder pads
+ *   • Two-segment robotic arms with elbow joints
+ *   • Wrist-mounted Time Core ring on the facing arm (glowing)
+ *   • Hooded helmet with swept-back crest fin (replaces the antenna)
+ *   • Armored thruster boots with cyan soles
+ *   • Chest Time Core that pulses — faster as the loop timer runs low
  */
-export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
+export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: Props) {
   const w = PLAYER_W;
   const h = PLAYER_H;
   const x = actor.x;
@@ -204,8 +216,6 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
   const handRy = shoulderY + (armLen + armLift) * g;
   const armLxOff = armL * face;
   const armRxOff = armR * face;
-  const armLpath = line(shoulderLx, shoulderY, shoulderLx - 1 + armLxOff, handLy);
-  const armRpath = line(shoulderRx, shoulderY, shoulderRx + 1 + armRxOff, handRy);
 
   // Legs: hip anchors near bottom of body, feet extend down (or up).
   const hipY = flip ? bodyY + 2 : bodyY + bodyH - 2;
@@ -216,11 +226,9 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
   const legLpath = line(hipLx, hipY, hipLx + footLxOff, footBaseY);
   const legRpath = line(hipRx, hipY, hipRx + footRxOff, footBaseY);
 
-  // Antenna tip (short line rising from head)
-  const antennaBaseY = flip ? headCy + headR : headCy - headR;
-  const antennaTipY = flip ? antennaBaseY + 5 : antennaBaseY - 5;
-  const antennaTipX = headCx + antenna * face;
-  const antennaPath = line(headCx, antennaBaseY, antennaTipX, antennaTipY);
+  // Hood-crest sway reuses the old antenna sway variable so idle/run
+  // animation phases stay in sync with the rest of the pose system.
+  // (The swept helmet crest above consumes `antenna`.)
 
   // Facing indicator: visor eye tilts toward facing direction.
   const eyeOffset = 1.4 * face;
@@ -264,63 +272,121 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
         </RoundedRect>
       ) : null}
 
-      {/* Legs (draw before body so they sit behind) */}
-      <Path path={legLpath} color={bodyShade} style="stroke" strokeWidth={3} strokeCap="round" />
-      <Path path={legRpath} color={bodyShade} style="stroke" strokeWidth={3} strokeCap="round" />
+      {/* ── LEGS: two-segment armored limbs + thruster boots ─────────
+          The joint paths (hip→foot) come from the pose system; we draw
+          them as thicker armored limbs and cap each with a boot. */}
+      <Path path={legLpath} color={bodyShade} style="stroke" strokeWidth={3.4} strokeCap="round" />
+      <Path path={legRpath} color={bodyShade} style="stroke" strokeWidth={3.4} strokeCap="round" />
+      {/* Knee guards — small plates at the midpoint of each leg */}
+      <Circle cx={(hipLx + hipLx + footLxOff) / 2} cy={(hipY + footBaseY) / 2} r={1.7} color={bodyMain} />
+      <Circle cx={(hipRx + hipRx + footRxOff) / 2} cy={(hipY + footBaseY) / 2} r={1.7} color={bodyMain} />
+      {/* Thruster boots — rounded armor cap + cyan sole strip */}
+      <RoundedRect x={hipLx + footLxOff - 3.2} y={footBaseY - 2 * g - (g > 0 ? 0 : 4)} width={6.4} height={4} r={1.6} color={bodyMain} />
+      <RoundedRect x={hipRx + footRxOff - 3.2} y={footBaseY - 2 * g - (g > 0 ? 0 : 4)} width={6.4} height={4} r={1.6} color={bodyMain} />
+      <Rect x={hipLx + footLxOff - 3.2} y={flip ? footBaseY : footBaseY - 1} width={6.4} height={1.4} color={visor} opacity={0.9} />
+      <Rect x={hipRx + footRxOff - 3.2} y={flip ? footBaseY : footBaseY - 1} width={6.4} height={1.4} color={visor} opacity={0.9} />
 
-      {/* Body — chrome plate with a darker underside strip */}
-      <RoundedRect x={bodyX} y={bodyY} width={bodyW} height={bodyH} r={5} color={bodyMain} />
+      {/* ── BODY: dark exo-suit + chest armor plate + energy seams ── */}
+      <RoundedRect x={bodyX} y={bodyY} width={bodyW} height={bodyH} r={5} color={bodyShade} />
+      {/* Chest armor plate (lighter, sits over the suit) */}
       <RoundedRect
-        x={bodyX + 1}
-        y={bodyY + 1}
-        width={bodyW - 2}
-        height={bodyH - 2}
-        r={4}
-        color={visor}
-        style="stroke"
-        strokeWidth={0.8}
-        opacity={0.55}
-      />
-      {/* Chest bolt (blur skipped for echoes) */}
-      <Circle cx={cx} cy={bodyY + bodyH / 2} r={1.6} color={visor}>
-        {!echo ? <Blur blur={1.2} /> : null}
-      </Circle>
-      {/* Underside shade */}
-      <Rect
         x={bodyX + 2}
-        y={flip ? bodyY + 1 : bodyY + bodyH - 3}
+        y={bodyY + 1.5}
         width={bodyW - 4}
-        height={2}
-        color={bodyShade}
-        opacity={0.6}
-      />
-
-      {/* Arms (drawn after body, in front) */}
-      <Path path={armLpath} color={bodyShade} style="stroke" strokeWidth={2.6} strokeCap="round" />
-      <Path path={armRpath} color={bodyShade} style="stroke" strokeWidth={2.6} strokeCap="round" />
-
-      {/* Head — dome with visor slit */}
-      <Circle cx={headCx} cy={headCy} r={headR} color={bodyMain} />
-      <Circle cx={headCx} cy={headCy} r={headR} color={visor} style="stroke" strokeWidth={0.8} opacity={0.7} />
-
-      {/* --- Side-facing details ------------------------------------------ */}
-      {/* A crescent-shaped visor sweep that heavily favours the FACING side
-          of the head. Together with the eye offset and the jaw bump below,
-          it makes the direction of travel unmistakable at any zoom.
-          All hardcoded offsets are multiplied by `face` so the whole robot
-          truly mirrors when moving left. */}
-      <Circle
-        cx={headCx + 2.4 * face}
-        cy={headCy}
-        r={headR - 1}
-        color={visor}
-        opacity={0.55}
-      />
-      <Circle
-        cx={headCx + 3.5 * face}
-        cy={headCy - 0.6}
-        r={headR - 2.8}
+        height={bodyH * 0.62}
+        r={4}
         color={bodyMain}
+      />
+      {/* Tron-style energy seams — vertical spine + waist band */}
+      <Rect x={cx - 0.5} y={bodyY + 2} width={1} height={bodyH - 4} color={visor} opacity={0.75} />
+      <Rect x={bodyX + 2} y={bodyY + bodyH * 0.62} width={bodyW - 4} height={1} color={visor} opacity={0.55} />
+
+      {/* ── TIME CORE — pulsing chest orb. Beats faster as the loop
+          timer drains (timeFrac 1 → 0): the character literally shows
+          the countdown on its chest. */}
+      {(() => {
+        const pulseSpeed = 0.12 + (1 - (timeFrac ?? 1)) * 0.4;
+        const pulse = 0.55 + 0.45 * Math.abs(Math.sin(frame * pulseSpeed));
+        return (
+          <Group>
+            <Circle cx={cx} cy={bodyY + bodyH * 0.38} r={3.4} color={visor} opacity={0.35 * pulse}>
+              {!echo ? <Blur blur={3} /> : null}
+            </Circle>
+            <Circle cx={cx} cy={bodyY + bodyH * 0.38} r={2.2} color={visor} opacity={pulse} />
+            <Circle cx={cx} cy={bodyY + bodyH * 0.38} r={0.9} color="#FFFFFF" opacity={pulse} />
+          </Group>
+        );
+      })()}
+
+      {/* Shoulder pads */}
+      <Circle cx={shoulderLx} cy={shoulderY} r={2.6} color={bodyMain} />
+      <Circle cx={shoulderRx} cy={shoulderY} r={2.6} color={bodyMain} />
+
+      {/* ── ARMS: two-segment robotic limbs with elbow joints ────────
+          We split each arm path at its midpoint to fake an elbow, so
+          the limb reads as articulated rather than a rubber noodle. */}
+      {(() => {
+        const elbLx = shoulderLx + (armLxOff - 1) * 0.5;
+        const elbLy = shoulderY + ((armLen + armLift) * g) * 0.5;
+        const elbRx = shoulderRx + (armRxOff + 1) * 0.5;
+        const elbRy = shoulderY + ((armLen + armLift) * g) * 0.5;
+        const handLx = shoulderLx - 1 + armLxOff;
+        const handRx = shoulderRx + 1 + armRxOff;
+        return (
+          <Group>
+            {/* Left arm: upper + forearm */}
+            <Path path={line(shoulderLx, shoulderY, elbLx, elbLy)} color={bodyMain} style="stroke" strokeWidth={2.8} strokeCap="round" />
+            <Path path={line(elbLx, elbLy, handLx, handLy)} color={bodyShade} style="stroke" strokeWidth={2.2} strokeCap="round" />
+            <Circle cx={elbLx} cy={elbLy} r={1.2} color={bodyShade} />
+            {/* Right arm: upper + forearm */}
+            <Path path={line(shoulderRx, shoulderY, elbRx, elbRy)} color={bodyMain} style="stroke" strokeWidth={2.8} strokeCap="round" />
+            <Path path={line(elbRx, elbRy, handRx, handRy)} color={bodyShade} style="stroke" strokeWidth={2.2} strokeCap="round" />
+            <Circle cx={elbRx} cy={elbRy} r={1.2} color={bodyShade} />
+            {/* Wrist Time Core ring on the FACING arm — the gadget that
+                powers the loop. Small glowing ring + core dot. */}
+            {(() => {
+              const hx = face > 0 ? handRx : handLx;
+              const hy = face > 0 ? handRy : handLy;
+              return (
+                <Group>
+                  <Circle cx={hx} cy={hy} r={2.2} color={visor} style="stroke" strokeWidth={1.1} opacity={0.95} />
+                  <Circle cx={hx} cy={hy} r={0.9} color="#FFFFFF" opacity={0.9} />
+                </Group>
+              );
+            })()}
+          </Group>
+        );
+      })()}
+
+      {/* ── HELMET: hooded dome + swept crest + visor band ─────────── */}
+      <Circle cx={headCx} cy={headCy} r={headR} color={bodyMain} />
+      {/* Hood crest — a swept fin leaning AWAY from the facing direction
+          (aerodynamic "running hood" silhouette). Replaces the old antenna. */}
+      {(() => {
+        const crestBaseY = flip ? headCy + headR * 0.4 : headCy - headR * 0.9;
+        const crestTipX = headCx - face * (headR + 4 + antenna * 0.5);
+        const crestTipY = flip ? crestBaseY + 5 : crestBaseY - 1.5;
+        const p = Skia.Path.Make();
+        p.moveTo(headCx, crestBaseY);
+        p.quadTo(headCx - face * (headR * 0.9), crestBaseY - 2 * g, crestTipX, crestTipY);
+        return (
+          <>
+            <Path path={p} color={bodyShade} style="stroke" strokeWidth={2.6} strokeCap="round" />
+            <Circle cx={crestTipX} cy={crestTipY} r={1.2} color={visor}>
+              {!echo ? <Blur blur={1.2} /> : null}
+            </Circle>
+          </>
+        );
+      })()}
+
+      {/* Visor band — a horizontal armored slit across the face */}
+      <RoundedRect
+        x={headCx - headR * 0.85}
+        y={headCy - 2.2}
+        width={headR * 1.7}
+        height={4.4}
+        r={2.2}
+        color={bodyShade}
       />
       {/* Bright visor eye — pushed hard to the front-of-face side.
           The rect is anchored at its LEFT edge; when facing left we shift
@@ -346,11 +412,28 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive }: Props) {
       {/* Jaw bump — a small chin nudge on the facing side. */}
       <Circle cx={headCx + headR * 0.55 * face} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.85} />
 
-      {/* Antenna — leans forward toward the facing direction. */}
-      <Path path={antennaPath} color={visor} style="stroke" strokeWidth={1.4} strokeCap="round" />
-      <Circle cx={antennaTipX} cy={antennaTipY} r={1.8} color={visor}>
-        {!echo ? <Blur blur={1.6} /> : null}
-      </Circle>
+      {/* ── RUN TRAIL — faint cyan streaks behind the runner. Drawn in
+          the character so it inherits the same mirroring/flip logic.
+          Three fading horizontal streaks trail opposite the facing dir. */}
+      {pose === "run" ? (
+        <Group>
+          {[0, 1, 2].map((i) => {
+            const dist = 6 + i * 6;
+            const ty = cy - 4 + i * 4;
+            return (
+              <Rect
+                key={i}
+                x={face > 0 ? cx - dist - 8 : cx + dist}
+                y={ty}
+                width={8}
+                height={1.4}
+                color={visor}
+                opacity={0.28 - i * 0.08}
+              />
+            );
+          })}
+        </Group>
+      ) : null}
 
       {/* Thruster when jumping */}
       {pose === "jump" ? (

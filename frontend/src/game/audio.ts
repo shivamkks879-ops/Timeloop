@@ -22,6 +22,7 @@ export type Cue =
   | "rewind"
   | "portal"
   | "laser"
+  | "zap"
   | "win"
   | "die"
   | "ui_tap";
@@ -33,6 +34,7 @@ const SFX_VOLUME: Record<Cue, number> = {
   rewind: 0.85,
   portal: 0.7,
   laser: 0.6,
+  zap: 0.8,
   win: 0.9,
   die: 0.75,
   ui_tap: 0.4,
@@ -46,6 +48,7 @@ const SFX_SOURCES = {
   rewind: require("../../assets/audio/rewind.wav"),
   portal: require("../../assets/audio/portal.wav"),
   laser: require("../../assets/audio/laser.wav"),
+  zap: require("../../assets/audio/zap.wav"),
   win: require("../../assets/audio/win.wav"),
   die: require("../../assets/audio/die.wav"),
   ui_tap: require("../../assets/audio/ui_tap.wav"),

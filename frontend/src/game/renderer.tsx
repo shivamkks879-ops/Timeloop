@@ -257,8 +257,50 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
     const rotorFrame = animFrame % 8; // 8-frame rotor cycle
     const rotorSpan = 5 + Math.sin((animFrame / 4) * Math.PI) * 1.5;
     const scannerVisible = !s.stalled && rotorFrame % 4 === 0;
+
+    // ── Proximity alert ─────────────────────────────────────────────
+    // If the ALIVE player is close to the drone's patrol line, the
+    // drone blinks a soft red alert ring + "!" — the player gets a
+    // readable warning BEFORE contact, so deaths feel fair.
+    const pl = state.player;
+    const pcx = pl.x + PLAYER_W / 2;
+    const pcy = pl.y + PLAYER_H / 2;
+    const dcx = s.px + 13;
+    const dcy = s.py + 13;
+    const nearPlayer =
+      pl.alive && Math.abs(pcx - dcx) < 96 && Math.abs(pcy - dcy) < 64;
+    // Pulse: sine over animFrame so the alert breathes at ~1 Hz.
+    const alertPulse = nearPlayer ? 0.45 + 0.35 * Math.sin(animFrame / 5) : 0;
+
     return (
       <Group key={`sn${s.def.id}`}>
+        {/* Proximity alert ring — soft red glow that pulses while the
+            player is in range. Renders behind the body so it reads as a
+            warning aura, not as damage. */}
+        {nearPlayer ? (
+          <Circle cx={dcx} cy={dcy} r={20} color={COLORS.red} opacity={alertPulse * 0.5}>
+            <Blur blur={5} />
+          </Circle>
+        ) : null}
+        {nearPlayer ? (
+          <Circle
+            cx={dcx}
+            cy={dcy}
+            r={17}
+            color={COLORS.red}
+            style="stroke"
+            strokeWidth={1.5}
+            opacity={alertPulse}
+          />
+        ) : null}
+        {/* Alert "!" glyph above the drone while the player is in range. */}
+        {nearPlayer ? (
+          <>
+            <Rect x={dcx - 1.2} y={s.py - 12} width={2.4} height={6} r={1} color={COLORS.red} opacity={Math.min(1, alertPulse + 0.3)} />
+            <Circle cx={dcx} cy={s.py - 4} r={1.4} color={COLORS.red} opacity={Math.min(1, alertPulse + 0.3)} />
+          </>
+        ) : null}
+
         {/* Hover glow under the body */}
         <RoundedRect x={s.px - 2} y={s.py + 22} width={30} height={4} r={2} color={COLORS.cyan} opacity={0.35}>
           <Blur blur={3} />
@@ -288,12 +330,13 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         <RoundedRect x={s.px} y={s.py} width={26} height={22} r={11} color={s.stalled ? "#1A3A4A" : "#0D2A3A"} />
         <RoundedRect x={s.px} y={s.py} width={26} height={22} r={11} color={COLORS.cyan} style="stroke" strokeWidth={1.5} opacity={0.9} />
 
-        {/* Scanner eye (pulsing cyan dot) — faces motion dir */}
+        {/* Scanner eye (pulsing cyan dot) — faces motion dir. Turns RED
+            when the player is in alert range. */}
         <Circle
           cx={s.px + 13 + (s.dir > 0 ? 4 : -4)}
           cy={s.py + 11}
           r={3}
-          color={s.stalled ? COLORS.textMuted : COLORS.cyan}
+          color={s.stalled ? COLORS.textMuted : nearPlayer ? COLORS.red : COLORS.cyan}
         >
           <Blur blur={2.5} />
         </Circle>
@@ -405,7 +448,13 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
         {sentryNodes}
         {beamNodes}
         {echoes}
-        <RobotSprite actor={state.player} frame={animFrame} pose={playerPose} />
+        {/* Player — Time Core pulses faster as the loop timer drains */}
+        <RobotSprite
+          actor={state.player}
+          frame={animFrame}
+          pose={playerPose}
+          timeFrac={1 - state.tick / SIM.LOOP_TICKS}
+        />
         {particleNodes}
 
         {/* ─── Electric death FX ──────────────────────────────────────
