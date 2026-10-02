@@ -208,14 +208,23 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   };
 
   // Arms: shoulder anchors near top of body, hands extend downward (or up).
+  //
+  // SIDE-PROFILE STANCE: in a platformer the character runs in profile, so
+  // BOTH shoulders and BOTH hands are biased toward the facing direction.
+  // Without this the arms sit symmetrically at the body's left/right edges
+  // and the character reads as a front-facing doll rather than a runner
+  // leaning into their direction of travel.
   const shoulderY = flip ? bodyY + bodyH - 2 : bodyY + 2;
-  const shoulderLx = bodyX + 2;
-  const shoulderRx = bodyX + bodyW - 2;
+  const shoulderLx = bodyX + 2 + face * 1.5;
+  const shoulderRx = bodyX + bodyW - 2 + face * 1.5;
   const armLen = 8;
   const handLy = shoulderY + (armLen + armLift) * g;
   const handRy = shoulderY + (armLen + armLift) * g;
-  const armLxOff = armL * face;
-  const armRxOff = armR * face;
+  // Swing offset from the pose system PLUS a constant forward bias so the
+  // hands always sit slightly in front of the chest (runner's ready stance).
+  const armFwd = face * 2;
+  const armLxOff = armL * face + armFwd;
+  const armRxOff = armR * face + armFwd;
 
   // Legs: hip anchors near bottom of body, feet extend down (or up).
   const hipY = flip ? bodyY + 2 : bodyY + bodyH - 2;
