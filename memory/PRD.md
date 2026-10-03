@@ -149,3 +149,15 @@ s + locked doors + guard patterns).
 * Audio calls wired but silent.
 * AdMob / IAP UI are stubs.
 
+
+## Session Update — AdMob Kotlin Build Fix (P0, RESOLVED)
+* All 100 levels shipped & verified via headless playtest (PASS: 100 FAIL: 0).
+* AdMob fully integrated (banner/interstitial/rewarded), package `com.timeloopscope.game`, v1.0.2.
+* FIXED: `compileReleaseKotlin` error `String?` vs `String` in `react-native-google-mobile-ads@17.2.0` (`ReactNativeGoogleMobileAdsNativeModule.kt`, classic + nextgen variants, 4 spots).
+* Fix delivered as auto-applying patch: `/app/frontend/patches/react-native-google-mobile-ads+17.2.0.patch` via `patch-package` + `scripts/apply-patches.js` postinstall hook (Windows-safe). Verified reverse/re-apply cleanly.
+* Pending: user confirms `gradlew bundleRelease` BUILD SUCCESSFUL on local Windows machine.
+
+## Remaining Backlog
+* P1: Timer-linked crest glow on character (`character.tsx`).
+* P2: Skins Screen update for new Exo-Suit silhouette.
+* P3: Cloud Save (Emergent Google Auth) + Remove Ads IAP (Play Billing).
