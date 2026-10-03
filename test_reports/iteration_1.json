@@ -1,0 +1,45 @@
+{
+  "summary": "Verified the character alignment visual bug fix in /app/frontend/src/game/character.tsx on the live web preview (/game/1-1). All 5 reported misalignments are FIXED and verified via zoomed clip screenshots (1920x1080 viewport = 2.5x render zoom of the same vector renderer): (A) idle at spawn - head attached to body (no gap), cyan/white visor eye sits INSIDE the head outline, hood crest fin visibly connected to head back-top, wrist Time-Core ring touching the body via forearm, boots at feet with cyan sole strip at the bottom edge; (B) run-right mid-run (held btn-right via mouse.down 450ms) - faces RIGHT, eye on right side, crest sweeping LEFT, run-trail streaks behind, all limbs attached; (C) face-left (held btn-left) - eye on LEFT side, crest sweeping RIGHT, trail to the right, nothing detached; (D) jump mid-air - legs tucked, twin cyan thruster lines + glow under feet, no detached parts; (E) HUD regression PASS - hud-timer counting (8.82s), ECHO 0/0 pill (correct: level 1-1 has maxEchoes=0), btn-pause + btn-restart visible, level name '1-1 · FIRST STEPS'. Phone viewport (390x844) smoke check also passed with identical HUD. No red screens, no console errors (only RN-web deprecation warnings + benign Skia ReadPixels perf notice).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "hud.tsx / controls.tsx",
+        "issue": "RN-web console deprecation warnings: 'textShadow* style props are deprecated. Use textShadow' (hud.tsx:142-144 uses textShadowColor/textShadowRadius) and 'props.pointerEvents is deprecated. Use style.pointerEvents' (hud.tsx:22, controls.tsx pass pointerEvents as prop). Cosmetic warnings only, no functional impact. Reference: /app/frontend/src/game/hud.tsx:22, /app/frontend/src/game/hud.tsx:142"
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screenshots/A_idle_zoom.png",
+    "/app/test_reports/screenshots/B_run_right_wide.png",
+    "/app/test_reports/screenshots/C_face_left_wide.png",
+    "/app/test_reports/screenshots/D_jump_midair.png",
+    "/app/test_reports/screenshots/idle_full.png"
+  ],
+  "action_items": [
+    "OPTIONAL (minor): migrate textShadowColor/textShadowRadius to the new textShadow style prop in hud.tsx and move pointerEvents prop into style objects to silence RN-web deprecation warnings",
+    "OPTIONAL (code hygiene): remove unused Line/vec imports in character.tsx instead of the 'void Line; void vec;' silencer at lines 521-523"
+  ],
+  "critical_code_review_comments": [
+    "character.tsx eye geometry verified correct for both facings: facing-right eye spans headCx+1.0..headCx+5.2 and facing-left headCx-5.2..headCx-1.0, both inside head radius 6 (line 400-416)",
+    "Crest base anchors at headCx - face*headR*0.45 / headCy - headR*0.75 (on the head surface) so it stays attached (line 371-387)",
+    "Boot sole strips at footBaseY+0.6 with height 1.4 sit exactly at boot bottom edge (boot spans footBaseY-2..footBaseY+2) (line 290-293)",
+    "No scaleX mirror flip used - directional asymmetry handled via 'face' multiplier, avoiding the historical double-flip bug (line 245-249)"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only testing per request)",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "None - no seed data needed; game state is local-only",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Visual bug fix is verified working. Game renders Skia canvas that scales with viewport (scale = min(w/worldW, h/worldH)); use a large viewport (e.g., 1920x1080) for zoomed character inspection. Level 1-1 world is 24x10 tiles (768x320 world units), player spawns at grid (0,7), PLAYER_W=22/H=28 with VISUAL_SCALE=1.35. Controls are RNGH LongPress(minDuration=0) gestures - use mouse.down()/mouse.up() on [data-testid=btn-left|btn-right|btn-jump]. Loop timer is 10s; click [data-testid=btn-restart] for a fresh loop before timed scenarios. NOTE: Playwright clip screenshots do not support the quality option (PNG only) - omit quality when using clip.",
+  "rca_of_issue": "Original bug (reported with screenshot by user): eye rects extended past the head outline on the right, crest fin rendered as a floating antenna disconnected from the head, wrist Time-Core ring floated far from the body, boot sole strips drawn mid-boot, and a 1px neck gap. Fix applied in character.tsx clamped eye rects inside head radius for both facings, re-anchored crest base onto the head's back-top surface, pulled arm/hand anchors toward the body, moved sole strips to the boot's outer bottom edge, and lowered the head 1px. Independent visual verification via zoomed screenshots confirms all five defects resolved in idle, run-right, face-left, and jump poses."
+}

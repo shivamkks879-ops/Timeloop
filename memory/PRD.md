@@ -161,3 +161,7 @@ s + locked doors + guard patterns).
 * P1: Timer-linked crest glow on character (`character.tsx`).
 * P2: Skins Screen update for new Exo-Suit silhouette.
 * P3: Cloud Save (Emergent Google Auth) + Remove Ads IAP (Play Billing).
+
+## Session Update — Character Alignment Fix (RESOLVED)
+* FIXED visual bugs in `src/game/character.tsx`: visor eye clamped inside head outline (was sticking out), hood crest now attached to head (was floating like antenna), wrist Time-Core ring pulled close to body, boot sole strips moved to boot edge, head lowered 1px for neck attachment. Unused Skia imports (Line, vec) removed.
+* Verified: headless playtest PASS 100 / FAIL 0 (engine untouched); testing_agent confirmed idle/run-right/face-left/jump all render coherent with no detached parts.

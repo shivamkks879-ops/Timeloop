@@ -20,12 +20,10 @@ import {
   Blur,
   Circle,
   Group,
-  Line,
   Path,
   Rect,
   RoundedRect,
   Skia,
-  vec,
 } from "@shopify/react-native-skia";
 
 import { COLORS } from "./constants";
@@ -196,7 +194,7 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   const bodyY = flip ? y + 8 + squash * g : y + 8 - squash * g;
   const headR = 6;
   const headCx = cx;
-  const headCy = flip ? y + h - 4 - bob : y + 4 + bob;
+  const headCy = flip ? y + h - 5 - bob : y + 5 + bob;
   const footBaseY = flip ? y + 4 : y + h - 4;
 
   // Path builder for a straight limb between two points, with rounded ends.
@@ -215,14 +213,14 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // and the character reads as a front-facing doll rather than a runner
   // leaning into their direction of travel.
   const shoulderY = flip ? bodyY + bodyH - 2 : bodyY + 2;
-  const shoulderLx = bodyX + 2 + face * 1.5;
-  const shoulderRx = bodyX + bodyW - 2 + face * 1.5;
+  const shoulderLx = bodyX + 3 + face;
+  const shoulderRx = bodyX + bodyW - 3 + face;
   const armLen = 8;
   const handLy = shoulderY + (armLen + armLift) * g;
   const handRy = shoulderY + (armLen + armLift) * g;
   // Swing offset from the pose system PLUS a constant forward bias so the
   // hands always sit slightly in front of the chest (runner's ready stance).
-  const armFwd = face * 2;
+  const armFwd = face * 1.2;
   const armLxOff = armL * face + armFwd;
   const armRxOff = armR * face + armFwd;
 
@@ -238,9 +236,6 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // Hood-crest sway reuses the old antenna sway variable so idle/run
   // animation phases stay in sync with the rest of the pose system.
   // (The swept helmet crest above consumes `antenna`.)
-
-  // Facing indicator: visor eye tilts toward facing direction.
-  const eyeOffset = 1.4 * face;
 
   // Visual scale — makes the robot render ~30% larger than its collision
   // box so it reads well on phone screens without changing physics.
@@ -292,8 +287,8 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
       {/* Thruster boots — rounded armor cap + cyan sole strip */}
       <RoundedRect x={hipLx + footLxOff - 3.2} y={footBaseY - 2 * g - (g > 0 ? 0 : 4)} width={6.4} height={4} r={1.6} color={bodyMain} />
       <RoundedRect x={hipRx + footRxOff - 3.2} y={footBaseY - 2 * g - (g > 0 ? 0 : 4)} width={6.4} height={4} r={1.6} color={bodyMain} />
-      <Rect x={hipLx + footLxOff - 3.2} y={flip ? footBaseY : footBaseY - 1} width={6.4} height={1.4} color={visor} opacity={0.9} />
-      <Rect x={hipRx + footRxOff - 3.2} y={flip ? footBaseY : footBaseY - 1} width={6.4} height={1.4} color={visor} opacity={0.9} />
+      <Rect x={hipLx + footLxOff - 3.2} y={flip ? footBaseY - 2 : footBaseY + 0.6} width={6.4} height={1.4} color={visor} opacity={0.9} />
+      <Rect x={hipRx + footRxOff - 3.2} y={flip ? footBaseY - 2 : footBaseY + 0.6} width={6.4} height={1.4} color={visor} opacity={0.9} />
 
       {/* ── BODY: dark exo-suit + chest armor plate + energy seams ── */}
       <RoundedRect x={bodyX} y={bodyY} width={bodyW} height={bodyH} r={5} color={bodyShade} />
@@ -339,8 +334,8 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
         const elbLy = shoulderY + ((armLen + armLift) * g) * 0.5;
         const elbRx = shoulderRx + (armRxOff + 1) * 0.5;
         const elbRy = shoulderY + ((armLen + armLift) * g) * 0.5;
-        const handLx = shoulderLx - 1 + armLxOff;
-        const handRx = shoulderRx + 1 + armRxOff;
+        const handLx = shoulderLx - 0.5 + armLxOff;
+        const handRx = shoulderRx + 0.5 + armRxOff;
         return (
           <Group>
             {/* Left arm: upper + forearm */}
@@ -372,12 +367,13 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
       {/* Hood crest — a swept fin leaning AWAY from the facing direction
           (aerodynamic "running hood" silhouette). Replaces the old antenna. */}
       {(() => {
-        const crestBaseY = flip ? headCy + headR * 0.4 : headCy - headR * 0.9;
-        const crestTipX = headCx - face * (headR + 4 + antenna * 0.5);
-        const crestTipY = flip ? crestBaseY + 5 : crestBaseY - 1.5;
+        const crestBaseX = headCx - face * headR * 0.45;
+        const crestBaseY = flip ? headCy + headR * 0.5 : headCy - headR * 0.75;
+        const crestTipX = headCx - face * (headR + 3 + antenna * 0.4);
+        const crestTipY = flip ? crestBaseY + 3.5 : crestBaseY - 1.2;
         const p = Skia.Path.Make();
-        p.moveTo(headCx, crestBaseY);
-        p.quadTo(headCx - face * (headR * 0.9), crestBaseY - 2 * g, crestTipX, crestTipY);
+        p.moveTo(crestBaseX, crestBaseY);
+        p.quadTo(headCx - face * headR * 1.1, crestBaseY - 1 * g, crestTipX, crestTipY);
         return (
           <>
             <Path path={p} color={bodyShade} style="stroke" strokeWidth={2.6} strokeCap="round" />
@@ -397,22 +393,20 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
         r={2.2}
         color={bodyShade}
       />
-      {/* Bright visor eye — pushed hard to the front-of-face side.
-          The rect is anchored at its LEFT edge; when facing left we shift
-          the anchor back by the width so the eye appears on the LEFT side
-          of the head instead of extending past it. */}
+      {/* Bright visor eye — sits INSIDE the visor band, biased toward the
+          facing side but never extending past the head outline. */}
       <RoundedRect
-        x={face >= 0 ? headCx + 0.4 + eyeOffset * 2 : headCx - 0.4 + eyeOffset * 2 - 5.5}
+        x={face >= 0 ? headCx + 1.0 : headCx - 1.0 - 4.2}
         y={headCy - 1.3}
-        width={5.5}
+        width={4.2}
         height={2.6}
         r={1.2}
         color="#FFFFFF"
       />
       <RoundedRect
-        x={face >= 0 ? headCx + 0.6 + eyeOffset * 2 : headCx - 0.6 + eyeOffset * 2 - 5.2}
+        x={face >= 0 ? headCx + 1.2 : headCx - 1.2 - 3.8}
         y={headCy - 1.4}
-        width={5.2}
+        width={3.8}
         height={2.8}
         r={1.2}
         color={visor}
@@ -521,7 +515,3 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
     </Group>
   );
 }
-
-// Silence unused import warnings.
-void Line;
-void vec;
