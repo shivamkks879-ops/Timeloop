@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "preinstall": "node ./scripts/cmd-guard.js --preinstall",
+    "postinstall": "node ./scripts/apply-patches.js",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
@@ -37,6 +38,7 @@
     "expo-symbols": "1.0.8",
     "expo-system-ui": "6.0.9",
     "expo-web-browser": "15.0.11",
+    "patch-package": "8.0.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
