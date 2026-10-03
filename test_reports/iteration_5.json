@@ -1,0 +1,34 @@
+{
+  "summary": "FRONT-ANGLE FIX VERIFIED on /app/frontend/src/game/character.tsx — the lean-blend between FRONT and PROFILE stances resolves the 'character always sideways' feedback. (A) IDLE on /game/1-1 fresh spawn (r5_A_idle_clip.jpeg): visor eye sits CENTRED under the horizontal visor band, hood crest points approximately straight up (no sideways sweep), shoulders/arms are symmetric at both body edges, jaw bump is not visually prominent — character reads as a mascot looking at camera. (B) RUN-RIGHT via mouse.down on testID=btn-right for 400ms (r5_B_run_right_clip.jpeg): character transitions to profile — visor eye shifted to the RIGHT, crest swept left (opposite facing), legs in run cycle, three cyan run-trail streaks trailing on the LEFT (opposite facing). After mouse.up + 600ms settle (r5_B2_settled_clip.jpeg): character returns to front-facing idle, eye re-centred. (C) FACE-LEFT via btn-left (r5_C_run_left_clip.jpeg): profile mirrors correctly — eye shifts to LEFT side, crest swept right, trail streaks on the RIGHT. Settle (r5_C2_settled_clip.jpeg) returns to front-facing. (D) JUMP (r5_D_jump_clip.jpeg): airborne pose maintains lean=1 profile with legs tucked, Time Core chest pulse visible; thruster particles render under feet when pose === 'jump'. (Regression) feet remain planted on ground tiles (scaleY origin still anchored at foot line), HUD renders (⏸ pause, ECHO 0/0, 1-1 FIRST STEPS title, countdown timer, left/right/jump controls). (Regression) /game/4-1 UPSIDE DOWN: character mirrors upside-down correctly on the ceiling and lean blend still works post-flip — eye/crest/arms render coherently when g=-1. Console shows only pre-existing benign warnings (textShadow* deprecated, props.pointerEvents deprecated, WebGL ReadPixels perf hint) — no new errors introduced. Code review: `lean` is correctly clamped to [0,1] (character.tsx L128), `faceLean = face * lean` multiplies every asymmetric offset (shoulder shift L242-243, armFwd L250, foot swing L260-261, crest base/tip X L406/L411/L415, visor eye sideShift L444, jaw bump cx L470), idle leanTarget = min(1,|vx|/MOVE_SPEED)*0.5 so a stationary actor sits perfectly front-facing (L127). No deprecated expo packages introduced in this patch.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screenshots/r5_1-1_full_idle.jpeg",
+    "/app/test_reports/screenshots/r5_A_idle_clip.jpeg",
+    "/app/test_reports/screenshots/r5_B_run_right_clip.jpeg",
+    "/app/test_reports/screenshots/r5_B2_settled_clip.jpeg",
+    "/app/test_reports/screenshots/r5_C_run_left_clip.jpeg",
+    "/app/test_reports/screenshots/r5_C2_settled_clip.jpeg",
+    "/app/test_reports/screenshots/r5_D_jump_clip.jpeg",
+    "/app/test_reports/screenshots/r5_flip_initial.jpeg",
+    "/app/test_reports/screenshots/r5_flip_moved.jpeg",
+    "/app/test_reports/screenshots/r5_flip_settled.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "character.tsx is now 572 lines — comfortably under the 700-line split threshold. Lean-blend logic is well-commented and localised to a single `faceLean` scalar, which is the right abstraction.",
+    "Minor nit: the `movingAbs` constant hard-codes SIM.MOVE_SPEED as 3.6 (character.tsx L119). Prefer importing MOVE_SPEED from ./constants or ./engine to keep the idle-lean target in sync if the sim speed is ever tuned.",
+    "Hood crest tip now uses `-faceLean * (antenna * 0.4)` (L411) so antenna sway direction fades with lean too — correct, keeps a static idle crest from oscillating sideways."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (frontend-only round)", "frontend": "100%" },
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Front/profile lean blend verified end-to-end. The character.tsx `lean` factor correctly centres visor eye, crest, arms, jaw bump, foot swing, and shoulder shift when at rest, and smoothly transitions to full profile during run/jump/fall/wall_slide. All screenshots stored under /app/test_reports/screenshots/r5_*.jpeg. Game runs in landscape web preview at 844x390. Level IDs /game/{world}-{index}. Controls testIDs: btn-left, btn-right, btn-jump. HUD pause button testID may differ (hud-pause lookup returned null) — not critical for this fix but worth confirming on next HUD-focused round."
+}

@@ -357,6 +357,7 @@ const styles = StyleSheet.create({
   padBtnActive: {
     backgroundColor: "rgba(0, 229, 255, 0.25)",
     borderColor: COLORS.cyan,
+    transform: [{ scale: 0.94 }],
   },
   padGlyph: {
     color: COLORS.cyan,
@@ -371,6 +372,7 @@ const styles = StyleSheet.create({
   },
   jumpBtnActive: {
     backgroundColor: "rgba(157, 0, 255, 0.45)",
+    transform: [{ scale: 0.94 }],
   },
   jumpLabel: {
     color: COLORS.white,

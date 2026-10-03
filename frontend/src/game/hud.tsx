@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
   },
   iconBtnPressed: {
     backgroundColor: "rgba(0, 229, 255, 0.2)",
+    transform: [{ scale: 0.94 }],
   },
   iconTxt: {
     color: COLORS.cyan,

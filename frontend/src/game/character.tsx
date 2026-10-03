@@ -26,7 +26,7 @@ import {
   Skia,
 } from "@shopify/react-native-skia";
 
-import { COLORS } from "./constants";
+import { COLORS, SIM } from "./constants";
 import { PLAYER_H, PLAYER_W } from "./engine";
 import { getCurrentSkin } from "./skins";
 import type { PlayerState } from "./types";
@@ -102,6 +102,32 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   const cy = y + h / 2;
   const flip = actor.gravityDir === -1;
   const face = actor.facing >= 0 ? 1 : -1;
+
+  // ── FRONT / PROFILE BLEND ─────────────────────────────────────────
+  // The character blends between a FRONT-facing stance (looking at the
+  // player, like a mascot sprite) when idle and a PROFILE stance
+  // (looking in the direction of travel) when moving / airborne.
+  //
+  // `lean` ∈ [0, 1]:
+  //   0 → fully front: visor eye centred, crest centred, arms neutral,
+  //       jaw bump centred, shoulders flush with body edges.
+  //   1 → fully profile: all directional asymmetries at full strength.
+  //
+  // We multiply every `face`-dependent offset by `lean`, so toggling
+  // the pose automatically re-centres the character. This fixes the
+  // "character always looks sideways even standing still" feedback.
+  const movingAbs = Math.min(1, Math.abs(actor.vx) / SIM.MOVE_SPEED);
+  const leanTarget =
+    pose === "run" || pose === "jump" || pose === "fall" || pose === "wall_slide"
+      ? 1
+      : pose === "land"
+      ? 0.6
+      : pose === "victory" || pose === "dead"
+      ? 0.2
+      : movingAbs * 0.5;     // idle: 0 at rest, up to 0.5 if drifting
+  const lean = Math.max(0, Math.min(1, leanTarget));
+  // Signed lean used wherever an asymmetric offset is wanted.
+  const faceLean = face * lean;
 
   const skin = echo ? null : getCurrentSkin();
   const bodyMain = echo ? ECHO_BODY : pose === "dead" ? RED : (skin?.bodyMain ?? BODY_LIGHT);
@@ -195,7 +221,7 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   const headR = 6;
   const headCx = cx;
   const headCy = flip ? y + h - 5 - bob : y + 5 + bob;
-  const footBaseY = flip ? y + 4 : y + h - 4;
+  const footBaseY = flip ? y + 2 : y + h - 2;
 
   // Path builder for a straight limb between two points, with rounded ends.
   const line = (x1: number, y1: number, x2: number, y2: number) => {
@@ -213,14 +239,15 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // and the character reads as a front-facing doll rather than a runner
   // leaning into their direction of travel.
   const shoulderY = flip ? bodyY + bodyH - 2 : bodyY + 2;
-  const shoulderLx = bodyX + 3 + face;
-  const shoulderRx = bodyX + bodyW - 3 + face;
+  const shoulderLx = bodyX + 3 + faceLean;
+  const shoulderRx = bodyX + bodyW - 3 + faceLean;
   const armLen = 8;
   const handLy = shoulderY + (armLen + armLift) * g;
   const handRy = shoulderY + (armLen + armLift) * g;
-  // Swing offset from the pose system PLUS a constant forward bias so the
-  // hands always sit slightly in front of the chest (runner's ready stance).
-  const armFwd = face * 1.2;
+  // Swing offset from the pose system PLUS a forward bias that fades
+  // out as the character returns to rest (so the arms stop pointing
+  // toward "the way I was walking" when I come to a stop).
+  const armFwd = faceLean * 1.2;
   const armLxOff = armL * face + armFwd;
   const armRxOff = armR * face + armFwd;
 
@@ -228,8 +255,10 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   const hipY = flip ? bodyY + 2 : bodyY + bodyH - 2;
   const hipLx = bodyX + 4;
   const hipRx = bodyX + bodyW - 4;
-  const footLxOff = legL * face;
-  const footRxOff = legR * face;
+  // Foot swing (run cycle) is directional — but we scale by `lean` so a
+  // stationary idle character doesn't look like it's about to walk off.
+  const footLxOff = legL * faceLean;
+  const footRxOff = legR * faceLean;
   const legLpath = line(hipLx, hipY, hipLx + footLxOff, footBaseY);
   const legRpath = line(hipRx, hipY, hipRx + footRxOff, footBaseY);
 
@@ -245,18 +274,25 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // already multiplied by `face` in the geometry above. Applying an
   // additional scaleX mirror would double-flip and cancel out — the classic
   // "character always faces right" bug this file previously suffered.
+  //
+  // Scale origin is the FOOT LINE (bottom of the physics box, or top when
+  // gravity is flipped) — NOT the center. Scaling about the center pushed
+  // the boots ~2px below the ground line, making the character visually
+  // sink into platforms. With the origin at the feet, the soles stay
+  // planted exactly on the physics ground plane at any scale.
   const VISUAL_SCALE = 1.35;
+  const footLineY = flip ? y : y + h;
 
   return (
     <Group
       opacity={opacity}
       transform={[
         { translateX: cx },
-        { translateY: cy },
+        { translateY: footLineY },
         { scaleX: VISUAL_SCALE },
         { scaleY: VISUAL_SCALE },
         { translateX: -cx },
-        { translateY: -cy },
+        { translateY: -footLineY },
       ]}
     >
       {/* Ambient glow behind body — skipped on echoes to keep blur passes
@@ -367,13 +403,16 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
       {/* Hood crest — a swept fin leaning AWAY from the facing direction
           (aerodynamic "running hood" silhouette). Replaces the old antenna. */}
       {(() => {
-        const crestBaseX = headCx - face * headR * 0.45;
+        const crestBaseX = headCx - faceLean * headR * 0.45;
         const crestBaseY = flip ? headCy + headR * 0.5 : headCy - headR * 0.75;
-        const crestTipX = headCx - face * (headR + 3 + antenna * 0.4);
+        // Crest tip X: when `lean` is 0 the tip sits directly above the
+        // head (pure front stance); as lean approaches 1 it sweeps back
+        // away from the facing direction like a running hood.
+        const crestTipX = headCx - faceLean * (headR + 3) - faceLean * (antenna * 0.4);
         const crestTipY = flip ? crestBaseY + 3.5 : crestBaseY - 1.2;
         const p = Skia.Path.Make();
         p.moveTo(crestBaseX, crestBaseY);
-        p.quadTo(headCx - face * headR * 1.1, crestBaseY - 1 * g, crestTipX, crestTipY);
+        p.quadTo(headCx - faceLean * headR * 1.1, crestBaseY - 1 * g, crestTipX, crestTipY);
         return (
           <>
             <Path path={p} color={bodyShade} style="stroke" strokeWidth={2.6} strokeCap="round" />
@@ -393,27 +432,42 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
         r={2.2}
         color={bodyShade}
       />
-      {/* Bright visor eye — sits INSIDE the visor band, biased toward the
-          facing side but never extending past the head outline. */}
-      <RoundedRect
-        x={face >= 0 ? headCx + 1.0 : headCx - 1.0 - 4.2}
-        y={headCy - 1.3}
-        width={4.2}
-        height={2.6}
-        r={1.2}
-        color="#FFFFFF"
-      />
-      <RoundedRect
-        x={face >= 0 ? headCx + 1.2 : headCx - 1.2 - 3.8}
-        y={headCy - 1.4}
-        width={3.8}
-        height={2.8}
-        r={1.2}
-        color={visor}
-        opacity={0.9}
-      />
-      {/* Jaw bump — a small chin nudge on the facing side. */}
-      <Circle cx={headCx + headR * 0.55 * face} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.85} />
+      {/* Bright visor eye — blends from a wide central band (front
+          stance) to a narrow side-shifted slit (profile stance) as
+          `lean` goes 0 → 1. This is the key reason the character looked
+          permanently sideways even standing still. */}
+      {(() => {
+        // Full-front: a 5.0-wide eye centred under the visor band.
+        // Full-profile: a 4.2-wide eye shifted ~2px toward facing side.
+        const eyeW = 5.0 - 0.8 * lean;
+        const eyeH = 2.6;
+        const sideShift = faceLean * 2.0;
+        const eyeX = headCx - eyeW / 2 + sideShift;
+        return (
+          <Group>
+            <RoundedRect
+              x={eyeX}
+              y={headCy - 1.3}
+              width={eyeW}
+              height={eyeH}
+              r={1.2}
+              color="#FFFFFF"
+            />
+            <RoundedRect
+              x={eyeX + 0.2}
+              y={headCy - 1.4}
+              width={Math.max(2, eyeW - 0.4)}
+              height={eyeH + 0.2}
+              r={1.2}
+              color={visor}
+              opacity={0.9}
+            />
+          </Group>
+        );
+      })()}
+      {/* Jaw bump — fades out when front-facing; emphasises the chin on
+          the facing side when profile. */}
+      <Circle cx={headCx + headR * 0.55 * faceLean} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.4 + 0.45 * lean} />
 
       {/* ── RUN TRAIL — faint cyan streaks behind the runner. Drawn in
           the character so it inherits the same mirroring/flip logic.

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Time Loop Escape",
     "slug": "time-loop-escape",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "scheme": "timeloopescape",
@@ -39,7 +39,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.timeloopscope.game",
-      "versionCode": 3,
+      "versionCode": 4,
       "softwareKeyboardLayoutMode": "pan"
     },
     "web": {

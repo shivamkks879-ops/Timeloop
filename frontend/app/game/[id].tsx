@@ -3,7 +3,7 @@
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { Suspense, useEffect, useRef, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { COLORS, SIM } from "@/src/game/constants";
@@ -27,6 +27,8 @@ import { haptic } from "@/src/game/haptics";
 import { spawnBurst } from "@/src/game/particles";
 import { onLevelCompleted as adsOnLevelCompleted } from "@/src/ads/interstitial";
 import { showRewarded } from "@/src/ads/rewarded";
+import { areAdsReady } from "@/src/ads/bootstrap";
+import { SciFiButton } from "@/src/components/SciFiButton";
 
 // Lazy-load the Skia renderer so its top-level Skia code doesn't run until
 // CanvasKit is ready (see _layout.tsx LoadSkiaWeb).
@@ -402,9 +404,34 @@ export default function GameScreen() {
 }
 
 function HintOverlay({ text }: { text: string }) {
+  // Auto-fade the tutorial hint so it never permanently covers gameplay
+  // (spec §16). Lifecycle: visible for 4.5 s, fades over 600 ms, then
+  // mounts out so it stops blocking any touches below.
+  const [mounted, setMounted] = useState(true);
+  const opacity = useRef(1);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t1 = setTimeout(() => {
+      // Simple JS-driven fade — the hint is 1 small view, cheap enough.
+      let frame = 0;
+      const total = 20;
+      const iv = setInterval(() => {
+        frame += 1;
+        opacity.current = Math.max(0, 1 - frame / total);
+        setTick((n) => n + 1);
+        if (frame >= total) {
+          clearInterval(iv);
+          setMounted(false);
+        }
+      }, 30);
+    }, 4500);
+    return () => clearTimeout(t1);
+  }, []);
+  if (!mounted) return null;
+  void tick;
   return (
     <View pointerEvents="none" style={styles.hintWrap}>
-      <View style={styles.hintPill}>
+      <View style={[styles.hintPill, { opacity: opacity.current }]}>
         <Text style={styles.hintText}>{text}</Text>
       </View>
     </View>
@@ -428,15 +455,27 @@ function PauseOverlay({
         <View style={styles.pauseCard}>
           <Text style={styles.overlayTitle}>PAUSED</Text>
           <View style={styles.overlayActions}>
-            <Pressable testID="btn-resume" onPress={onResume} style={({ pressed }) => [styles.oBtn, styles.oPrimary, pressed && styles.pressed]}>
-              <Text style={styles.oLabel}>RESUME</Text>
-            </Pressable>
-            <Pressable testID="btn-retry" onPress={onRestart} style={({ pressed }) => [styles.oBtn, pressed && styles.pressed]}>
-              <Text style={styles.oLabel}>RETRY</Text>
-            </Pressable>
-            <Pressable testID="btn-quit" onPress={onQuit} style={({ pressed }) => [styles.oBtn, pressed && styles.pressed]}>
-              <Text style={styles.oLabel}>QUIT</Text>
-            </Pressable>
+            <SciFiButton
+              testID="btn-resume"
+              label="RESUME"
+              variant="primary"
+              onPress={onResume}
+              stretch
+            />
+            <View style={styles.overlayRow}>
+              <SciFiButton
+                testID="btn-retry"
+                label="RETRY"
+                onPress={onRestart}
+                style={styles.rowBtn}
+              />
+              <SciFiButton
+                testID="btn-quit"
+                label="LEVELS"
+                onPress={onQuit}
+                style={styles.rowBtn}
+              />
+            </View>
           </View>
         </View>
       </View>
@@ -463,9 +502,17 @@ function OutcomeOverlay({
   const [starsShown, setStarsShown] = useState(0);
   const [adBusy, setAdBusy] = useState(false);
   const [adUsedThisDeath, setAdUsedThisDeath] = useState(false);
+  // Only render the WATCH AD button when the Mobile Ads SDK is actually
+  // initialised (consent granted + Android + ads supported). This way we
+  // NEVER advertise an action that is guaranteed to fall through — spec
+  // §17 "Only show WATCH AD TO CONTINUE when a rewarded ad is actually
+  // available".  The deeper rewarded.ts also guards with areAdsReady(),
+  // so this is pure UX cleanliness.
+  const canShowAd = areAdsReady();
   useEffect(() => {
     setStarsShown(0);
     setAdUsedThisDeath(false);
+    setAdBusy(false);
     if (!outcome || outcome.kind !== "won") return;
     const target = outcome.stars ?? 0;
     let cancelled = false;
@@ -505,7 +552,6 @@ function OutcomeOverlay({
                         style={[
                           styles.starBig,
                           lit ? styles.starLit : styles.starDim,
-                          // Shrink a bit for 4-5 star layouts so they still fit.
                           maxStars >= 5 ? { fontSize: 32 } : maxStars === 4 ? { fontSize: 36 } : null,
                           { transform: [{ scale: lit ? 1.05 : 0.85 }] },
                         ]}
@@ -521,47 +567,61 @@ function OutcomeOverlay({
           ) : (
             <Text style={styles.metaLine}>The loop closed without escape.</Text>
           )}
+          {/* Action stack: primary action on top (NEXT or WATCH-AD), two
+              secondary actions on a shared row below.  Vertical stacking
+              survives narrow (320 px) phones + big-finger tablets without
+              clipping or wrap-shuffle. */}
           <View style={styles.overlayActions}>
             {won ? (
-              <Pressable testID="btn-next" onPress={onNext} style={({ pressed }) => [styles.oBtn, styles.oPrimary, pressed && styles.pressed]}>
-                <Text style={styles.oLabel}>NEXT</Text>
-              </Pressable>
-            ) : (
-              // Rewarded-ad continue — only on death, once per death, never
-              // force-blocks. If ad is unavailable, player retries normally.
-              !adUsedThisDeath ? (
-                <Pressable
-                  testID="btn-watch-ad"
-                  disabled={adBusy}
-                  onPress={() => {
-                    if (adBusy) return;
-                    setAdBusy(true);
-                    playCue("ui_tap");
-                    showRewarded(
-                      "continue",
-                      () => {
-                        setAdBusy(false);
-                        setAdUsedThisDeath(true);
-                        onRetry();
-                      },
-                      () => {
-                        setAdBusy(false);
-                        setAdUsedThisDeath(true);
-                      },
-                    );
-                  }}
-                  style={({ pressed }) => [styles.oBtn, styles.oPrimary, pressed && styles.pressed, adBusy && styles.pressed]}
-                >
-                  <Text style={styles.oLabel}>{adBusy ? "LOADING…" : "▶ WATCH AD"}</Text>
-                </Pressable>
-              ) : null
-            )}
-            <Pressable testID="btn-retry-outcome" onPress={onRetry} style={({ pressed }) => [styles.oBtn, pressed && styles.pressed]}>
-              <Text style={styles.oLabel}>RETRY</Text>
-            </Pressable>
-            <Pressable testID="btn-quit-outcome" onPress={onQuit} style={({ pressed }) => [styles.oBtn, pressed && styles.pressed]}>
-              <Text style={styles.oLabel}>LEVELS</Text>
-            </Pressable>
+              <SciFiButton
+                testID="btn-next"
+                label="NEXT LEVEL"
+                variant="primary"
+                icon="▶"
+                onPress={onNext}
+                stretch
+              />
+            ) : canShowAd && !adUsedThisDeath ? (
+              <SciFiButton
+                testID="btn-watch-ad"
+                label="WATCH AD TO CONTINUE"
+                variant="primary"
+                icon="▶"
+                loading={adBusy}
+                onPress={() => {
+                  if (adBusy) return;
+                  setAdBusy(true);
+                  playCue("ui_tap");
+                  showRewarded(
+                    "continue",
+                    () => {
+                      setAdBusy(false);
+                      setAdUsedThisDeath(true);
+                      onRetry();
+                    },
+                    () => {
+                      setAdBusy(false);
+                      setAdUsedThisDeath(true);
+                    },
+                  );
+                }}
+                stretch
+              />
+            ) : null}
+            <View style={styles.overlayRow}>
+              <SciFiButton
+                testID="btn-retry-outcome"
+                label="RETRY"
+                onPress={onRetry}
+                style={styles.rowBtn}
+              />
+              <SciFiButton
+                testID="btn-quit-outcome"
+                label="LEVELS"
+                onPress={onQuit}
+                style={styles.rowBtn}
+              />
+            </View>
           </View>
         </View>
       </View>
@@ -610,8 +670,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderGlow,
     borderWidth: 1.5,
     borderRadius: 16,
-    padding: 28,
-    minWidth: 360,
+    padding: 24,
+    minWidth: 300,
+    maxWidth: 420,
+    width: "100%",
     alignItems: "center",
   },
   wonCard: { borderColor: COLORS.green },
@@ -661,9 +723,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   overlayActions: {
-    flexDirection: "row",
+    flexDirection: "column",
     gap: 10,
     marginTop: 8,
+    alignSelf: "stretch",
+  },
+  overlayRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  rowBtn: {
+    flex: 1,
   },
   oBtn: {
     paddingVertical: 12,

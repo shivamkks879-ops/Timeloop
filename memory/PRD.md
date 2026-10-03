@@ -165,3 +165,29 @@ s + locked doors + guard patterns).
 ## Session Update — Character Alignment Fix (RESOLVED)
 * FIXED visual bugs in `src/game/character.tsx`: visor eye clamped inside head outline (was sticking out), hood crest now attached to head (was floating like antenna), wrist Time-Core ring pulled close to body, boot sole strips moved to boot edge, head lowered 1px for neck attachment. Unused Skia imports (Line, vec) removed.
 * Verified: headless playtest PASS 100 / FAIL 0 (engine untouched); testing_agent confirmed idle/run-right/face-left/jump all render coherent with no detached parts.
+
+## Session Update — Phase A: Gameplay Feel (RESOLVED)
+* AUDIT: engine already had coyote time (7t), jump buffer (7t), variable jump height, 1px-substepped collision, instant accel/decel — left unchanged per spec.
+* FIXED: character visually sank ~2.2px into platforms — boot soles now end exactly at physics box bottom + Skia visual scale (1.35x) origin moved from sprite center to FOOT LINE (gravity-flip aware). Physics/hitbox untouched.
+* Camera: user CONFIRMED fit-to-screen stays (no follow camera).
+* Decisions: no new obstacles this release (v1.1), AdMob placeholder IDs continue, procedural audio OK for now.
+* Verified: playtest PASS 100/0; testing_agent round 2 — feet planted idle/run/landing + gravity-flip ceiling walk on 4-1 (full flip-to-exit flow completed). Report: /app/test_reports/iteration_2.json.
+* KNOWN (informational): /game/[id] route does NOT enforce isLevelUnlocked() — locked levels playable via direct URL. Pending user decision whether to gate.
+* NEXT: Phase B (Buttons & UI polish) → Phase C (Visual polish) → Phase D (Audio) → Phase E (AdMob prod hardening) → Phase F (Release prep).
+
+## Session Update — Phase B: Buttons & UI Polish (RESOLVED)
+* NEW: src/components/SciFiButton.tsx — unified animated action button, Reanimated press scale (0.955) + glow bump, variants primary|secondary|danger, built-in 450ms double-tap guard, loading state, stretch flag, min touch target 48×44.
+* UPDATED: app/game/[id].tsx PauseOverlay + OutcomeOverlay now use SciFiButton. Primary action (RESUME / NEXT LEVEL / WATCH AD) is full-width on top, RETRY + LEVELS secondary row below. Card is responsive (width:100%, maxWidth:420) — fits 300-420px phones.
+* FIX: WATCH AD button only renders when areAdsReady() returns true (spec §17). Also hidden after one use per death.
+* FIX: tutorial hint auto-fades after 4.5s + 600ms fade so it never permanently blocks gameplay (spec §16).
+* POLISH: controls (D-pad/JUMP) + HUD icon buttons (pause/restart) now scale(0.94) on press for tactile feedback.
+* Verified: playtest PASS 100/0; testing_agent round 3 — pause/dead/won overlays, double-tap guard (NEXT only loads 1-2 not 1-3), hint fade, press feedback (JUMP + pause). Report: /app/test_reports/iteration_3.json.
+* NEXT: Phase C (Visual polish) → Phase D (Audio) → Phase E (AdMob prod hardening) → Phase F (Release prep).
+
+## Session Update — Phase C/E/F + Front-Angle Fix (ALL RESOLVED)
+* PHASE C: lasers upgraded to 3-layer energy beams (soft glow halo + body + white-hot flickering core at ~12 Hz) + pulsing endpoint energy nodes. Loop-rewind time ripple (concentric purple+cyan rings) spawns at the spawn point for 0.5s on each echo creation. Hitbox unchanged.
+* PHASE E: AdMob audited — config.ts already prod-safe (TestIds in __DEV__, placeholder prod strings); interstitial fires every 3-5 completed levels with 10s timeout + graceful cleanup; rewarded has 8s timeout + unavailable fallbacks. No code changes needed.
+* PHASE F: app.json bumped — version 1.0.2 → 1.0.3, android.versionCode 3 → 4. Package name com.timeloopscope.game UNCHANGED.
+* FRONT-ANGLE FIX: character.tsx introduced `lean` factor [0..1] + `faceLean = face * lean`. Idle → front-facing (eye centred, crest straight up, arms symmetric, jaw neutral); run/jump/fall/wall-slide → full profile; victory/dead → minimal (0.2); land → 0.6. Eye width also contracts in profile (5.0 → 4.2 px) + shifts ±2 px. SIM.MOVE_SPEED imported properly from constants.
+* Verified: playtest PASS 100/0; testing_agent round 4 (laser VFX, rewind ripple, AdMob config, version bump) + round 5 (front angle idle, profile running L+R, jump profile, feet planted) — all PASS. Reports: /app/test_reports/iteration_4.json, iteration_5.json.
+* Production-ready. User to run: git pull → yarn install → gradlew bundleRelease on local Windows.

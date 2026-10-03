@@ -359,17 +359,60 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
 
   const beamNodes = state.beams.map((b, i) => {
     const isVertical = b.x1 === b.x2;
-    const bx = Math.min(b.x1, b.x2) - (isVertical ? 3 : 0);
-    const by = Math.min(b.y1, b.y2) - (isVertical ? 0 : 3);
-    const bw = isVertical ? 6 : Math.abs(b.x2 - b.x1);
-    const bh = isVertical ? Math.abs(b.y2 - b.y1) : 6;
-    if (bw <= 0 || bh <= 0) return null;
+    const len = isVertical ? Math.abs(b.y2 - b.y1) : Math.abs(b.x2 - b.x1);
+    if (len <= 0) return null;
+    // Beam axis + perpendicular — used to build concentric layered rects.
+    const px = Math.min(b.x1, b.x2);
+    const py = Math.min(b.y1, b.y2);
+    // Thickness (perpendicular). Flicker it ±1 px at ~12 Hz so the beam
+    // reads as a live, humming energy field instead of a static rectangle.
+    // Hitbox stays identical to the physics beam (never widened by VFX).
+    const flicker = 0.5 + 0.5 * Math.sin(animFrame / 5 + i);
+    const thick = 4 + flicker * 1.5;         // outer bright
+    const coreThick = 1.6 + flicker * 0.5;   // bright inner line
+    const glowThick = thick + 10;            // soft outer blur
+    const px0 = isVertical ? px - thick / 2 : px;
+    const py0 = isVertical ? py : py - thick / 2;
+    const bw = isVertical ? thick : len;
+    const bh = isVertical ? len : thick;
+    const gx = isVertical ? px - glowThick / 2 : px;
+    const gy = isVertical ? py : py - glowThick / 2;
+    const gw = isVertical ? glowThick : len;
+    const gh = isVertical ? len : glowThick;
+    const cx1 = isVertical ? px - coreThick / 2 : px;
+    const cy1 = isVertical ? py : py - coreThick / 2;
+    const cw = isVertical ? coreThick : len;
+    const ch = isVertical ? len : coreThick;
+    // Endpoint energy nodes — pulsing circles at the emitter + target
+    // that sell the beam as electricity being FIRED rather than just
+    // being there.
+    const nodeR = 3 + flicker * 1.4;
     return (
       <Group key={`b${i}`}>
-        <Rect x={bx} y={by} width={bw} height={bh} color={COLORS.red} opacity={0.85} />
-        <Rect x={bx - 2} y={by - 2} width={bw + 4} height={bh + 4} color={COLORS.red} opacity={0.35}>
-          <Blur blur={6} />
+        {/* Outer soft glow */}
+        <Rect x={gx} y={gy} width={gw} height={gh} color={COLORS.red} opacity={0.28}>
+          <Blur blur={5} />
         </Rect>
+        {/* Mid-opacity beam body */}
+        <Rect x={px0} y={py0} width={bw} height={bh} color={COLORS.red} opacity={0.9} />
+        {/* Bright white-hot core — flickers between red & white */}
+        <Rect
+          x={cx1}
+          y={cy1}
+          width={cw}
+          height={ch}
+          color={flicker > 0.6 ? "#FFEAEE" : "#FFFFFF"}
+          opacity={0.95}
+        />
+        {/* Endpoint energy nodes */}
+        <Circle cx={b.x1} cy={b.y1} r={nodeR} color={COLORS.red} opacity={0.8}>
+          <Blur blur={2} />
+        </Circle>
+        <Circle cx={b.x1} cy={b.y1} r={nodeR * 0.5} color="#FFFFFF" opacity={0.95} />
+        <Circle cx={b.x2} cy={b.y2} r={nodeR} color={COLORS.red} opacity={0.8}>
+          <Blur blur={2} />
+        </Circle>
+        <Circle cx={b.x2} cy={b.y2} r={nodeR * 0.5} color="#FFFFFF" opacity={0.95} />
       </Group>
     );
   });
@@ -395,6 +438,22 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
     landRef.current.tick = animFrame;
   }
   landRef.current.ground = state.player.onGround;
+
+  // Track loop-rewind ticks — when the engine's loop counter advances we
+  // store the animFrame at which the rewind happened so the renderer can
+  // draw an expanding time-ripple at the spawn point for the next ~30
+  // frames (0.5 s @ 60 TPS). Pure visual, zero gameplay side-effect.
+  const rewindRef = useRef<{ loop: number; tick: number }>({ loop: 0, tick: -100 });
+  if (state.loop > rewindRef.current.loop) {
+    rewindRef.current.tick = animFrame;
+    rewindRef.current.loop = state.loop;
+  } else if (state.loop < rewindRef.current.loop) {
+    // Level was reset — reset the tracker too so the next rewind triggers.
+    rewindRef.current.loop = state.loop;
+    rewindRef.current.tick = -100;
+  }
+  const rewindAge = animFrame - rewindRef.current.tick;
+  const showRipple = rewindAge >= 0 && rewindAge < 30;
 
   const playerPose: Pose = derivePose(
     state.player,
@@ -456,6 +515,30 @@ export function GameRenderer({ state, width, height, timeLow }: Props) {
           timeFrac={1 - state.tick / SIM.LOOP_TICKS}
         />
         {particleNodes}
+
+        {/* Loop-rewind time ripple — two concentric expanding rings at
+            the spawn point whenever a new echo is born. Pure VFX; the
+            `rewindRef` is bumped from `state.loop` growth. Max life ~30
+            frames so it never bleeds into the next loop. */}
+        {showRipple ? (() => {
+          const t = rewindAge / 30;                   // 0..1
+          const r1 = 10 + t * 60;
+          const r2 = 10 + t * 90;
+          const alpha = (1 - t);
+          const sx = state.spawnX + 11;
+          const sy = state.spawnY + 14;
+          return (
+            <Group>
+              <Circle cx={sx} cy={sy} r={r1} color={COLORS.purple} style="stroke" strokeWidth={2.2} opacity={0.9 * alpha}>
+                <Blur blur={1.5} />
+              </Circle>
+              <Circle cx={sx} cy={sy} r={r2} color={COLORS.cyan} style="stroke" strokeWidth={1.4} opacity={0.6 * alpha} />
+              <Circle cx={sx} cy={sy} r={6 + t * 10} color={COLORS.purple} opacity={0.55 * alpha}>
+                <Blur blur={6} />
+              </Circle>
+            </Group>
+          );
+        })() : null}
 
         {/* ─── Electric death FX ──────────────────────────────────────
             Rendered last in world space so the burst sits ON TOP of
