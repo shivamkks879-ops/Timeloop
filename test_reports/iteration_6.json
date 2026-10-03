@@ -1,0 +1,42 @@
+{
+  "summary": "USER-BUG ROUND VERIFIED — input-latch fix works end-to-end on /game/1-1 (landscape 844x390 web preview). (1) JUMP RELIABILITY [main bug]: 8/8 VERY quick taps on btn-jump (alternating ~10ms back-to-back mouse.down/up and 55ms holds, 350ms+ settle between) produced a visible airborne jump each time — verified by canvas pixel-diff in a tight character clip (idle noise floor 0-12px vs 1591-2132px per jump) with visible rise and landing between taps. Before the latch these sub-frame taps were dropped; now 8/8. (2) VARIABLE HEIGHT preserved: quick tap peak rise = 21px vs 500ms hold = 102px (head-tracked via bright-pixel row detection, star-noise excluded) — short hop vs full jump clearly distinct, JUMP_CUT still functional. (3) MOVEMENT NOT BROKEN BY LATCH: 400ms btn-right hold moved character right (diff 2005px) and it STOPPED after release (post-release drift diff 35px over 350ms window, no auto-walk); 1 quick ~15ms tap on btn-left produced a single nudge (746px diff) then full stop (48px drift). No sticky input from the latch. (4) PRESSED VISUALS: JUMP button purple border ring bbox 83px unpressed -> 74px pressed (ratio 0.89 = scale 0.9) with brighter #D580FF border/0.55 fill (r6_jump_pressed.jpeg); D-pad btn-right pressed bright-cyan ring 63x63px vs 72px layout (0.875 = scale 0.9) + pressed/unpressed visual diff 3488px (thicker 2.5px border + brighter fill clearly visible in r6_dpad_pressed2.jpeg). (5) PAUSE LATCH SAFETY: quick JUMP tap immediately followed by btn-pause -> resume via btn-resume; post-resume diffs 0/68px = no stale jump fired after resume (pause overlay screenshot r6_pause_overlay.jpeg). (6) REGRESSION: level 1-1 still completable — held btn-right 4.5s -> ESCAPED overlay with grade S, 3 stars, 'Echoes used: 0 - Par: 0', NEXT LEVEL/RETRY/LEVELS buttons all rendered (r6_escaped.jpeg); HUD timer counts down correctly (10.0s -> 9.78s after restart), ECHO 0/0 counter fine; character feet planted; only console errors are 2x pre-existing benign WebAudio autoplay warnings (synthetic CDP input doesn't unlock AudioContext on web — not a regression). HAPTICS: web-noop by design (Platform.OS==='web' bail in haptics.ts L53) — mapping verified in code only (jump/land=Medium, land_hard/laser/rewind=Heavy, death=Error, win=Success, new 'move'=selection tick fired on rest->move and direction flip in [id].tsx L180-184, per-button press haptics in controls.tsx setBtn L110); vibration itself must be verified by user on Android device.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screenshots/r6_initial.jpeg",
+    "/app/test_reports/screenshots/r6_tap1_mid.jpeg",
+    "/app/test_reports/screenshots/r6_tap8_mid.jpeg",
+    "/app/test_reports/screenshots/r6_quick_peak_clip.jpeg",
+    "/app/test_reports/screenshots/r6_hold_peak_clip.jpeg",
+    "/app/test_reports/screenshots/r6_diffmask_quick.png",
+    "/app/test_reports/screenshots/r6_diffmask_hold.png",
+    "/app/test_reports/screenshots/r6_pause_overlay.jpeg",
+    "/app/test_reports/screenshots/r6_jump_pressed.jpeg",
+    "/app/test_reports/screenshots/r6_dpad_pressed2.jpeg",
+    "/app/test_reports/screenshots/r6_dpad_unpressed.jpeg",
+    "/app/test_reports/screenshots/r6_escaped.jpeg"
+  ],
+  "action_items": [
+    "Optional (user-side): verify haptic strength on the Android device — web preview cannot exercise vibration; code mapping is correct.",
+    "Optional (code health): split /app/frontend/app/game/[id].tsx (794 lines > 700 guideline) — extract PauseOverlay/OutcomeOverlay/HintOverlay into src/game/overlays.tsx on the next feature touch."
+  ],
+  "critical_code_review_comments": [
+    "Latch implementation is correct: bits set on every observed press in TouchControls.onChange ([id].tsx L407-415), merged live||latched into encodeInput (L120-124), cleared after exactly ONE delivered engine tick (L125), and cleared on pause (L97), retry (L359) and level-change init (L86). No stale-press path found; verified empirically via pause-resume test.",
+    "Latch does not break release semantics: engine consumes latched bit for one tick then live false takes over, so JUMP_CUT (engine.ts L544) still truncates quick taps into short hops — verified 21px vs 102px heights.",
+    "Edge note: if engine status != 'playing' the while-loop breaks BEFORE the merge (L114), so a latch bit could persist one extra frame until outcome/pause handlers clear it — harmless in practice because doRetry/setPaused both reset latchRef.",
+    "File size: [id].tsx is 794 lines (>700 split threshold) — overlays should be extracted; controls.tsx (389) and haptics.ts (89) are fine.",
+    "No deprecated Expo packages in touched files (expo-haptics is the current API). Only pre-existing RN-web deprecation console warnings (textShadow*, pointerEvents) remain."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (frontend-only round)", "frontend": "100% (6/6 test groups pass)" },
+  "seed_data_creation": "none (game is fully local; no backend)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 3 user bugs verified fixed: jump reliability 8/8 quick taps, stronger pressed visuals (measured scale ~0.89 on both JUMP and D-pad), haptics remapped (code-verified, web-noop). Jump-detection methodology for future rounds: tight canvas clip {x:0,y:130,w:64,h:188} around spawn character (head rest row ~129, feet ~170 in clip at 844x390), idle noise floor 0-12px at diff threshold 48; full-canvas clips get contaminated by twinkling starfield — use bright-pixel head-row tracking (>=5 bright px/row) for height measurement. Game facts: level 1-1 straight corridor, run-right 4.5s reaches portal (ESCAPED, grade S); 10s loop timer, world-1 maxEchoes=0 (timeout = death) so restart via btn-restart between long test batches. testIDs: btn-left/btn-right/btn-jump/btn-pause/btn-restart/hud-timer/btn-resume/btn-retry/btn-quit/btn-next/btn-retry-outcome/btn-quit-outcome.",
+  "rca_of_issue": "ORIGINAL BUG RCA (confirmed fixed): game loop samples controlsRef only inside the fixed-timestep accumulator while-loop (60Hz). A tap whose down+up both land between two rAF-served engine ticks never sets controlsRef true at sample time -> jump silently dropped. FIX: latchRef accumulates every observed press in onChange; loop merges live||latched and clears latch after one delivered tick. Verified: 8/8 sub-16ms-class taps now produce jumps, no sticky movement after release, no stale fire across pause/resume."
+}

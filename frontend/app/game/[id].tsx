@@ -50,6 +50,12 @@ export default function GameScreen() {
   // Engine + controls in refs so we can mutate at 60Hz without re-render cost.
   const stateRef = useRef<EngineState | null>(null);
   const controlsRef = useRef<ControlState>({ left: false, right: false, jump: false });
+  // Input latch: a quick tap (down+up) can complete BETWEEN two 60Hz
+  // engine ticks — the press then never reaches the engine and the jump
+  // is silently dropped ("jump button kbhi kbhi work nahi karta"). The
+  // latch holds any observed press until the engine has consumed it for
+  // at least ONE tick, after which the live control state takes over.
+  const latchRef = useRef<ControlState>({ left: false, right: false, jump: false });
   const pausedRef = useRef(false);
   const rafRef = useRef<number | null>(null);
   const accRef = useRef(0);
@@ -67,6 +73,7 @@ export default function GameScreen() {
     teleCd: 0,
     alive: true,
     keys: 0,
+    vx: 0,
   });
 
   // Init engine when level changes.
@@ -76,13 +83,18 @@ export default function GameScreen() {
     setOutcome(null);
     setPaused(false);
     pausedRef.current = false;
-    prevRef.current = { onGround: true, vy: 0, teleCd: 0, alive: true, keys: 0 };
+    latchRef.current = { left: false, right: false, jump: false };
+    prevRef.current = { onGround: true, vy: 0, teleCd: 0, alive: true, keys: 0, vx: 0 };
     levelStartRef.current = Date.now();
     setFrame((n) => n + 1);
   }, [level?.id]);
 
   useEffect(() => {
     pausedRef.current = paused;
+    // Drop any latched-but-undelivered presses when the game pauses so a
+    // tap that landed during the death/pause transition can't fire after
+    // resume.
+    if (paused) latchRef.current = { left: false, right: false, jump: false };
   }, [paused]);
 
   // Fixed-timestep loop
@@ -101,11 +113,16 @@ export default function GameScreen() {
           const s = stateRef.current;
           if (s.status !== "playing") break;
           const prevLoop = s.loop;
+          // Merge live controls with the tap-latch so a press is never
+          // lost between ticks. Latch bits clear after ONE delivered tick.
+          const live = controlsRef.current;
+          const latched = latchRef.current;
           const input = encodeInput(
-            controlsRef.current.left,
-            controlsRef.current.right,
-            controlsRef.current.jump
+            live.left || latched.left,
+            live.right || latched.right,
+            live.jump || latched.jump
           );
+          latchRef.current = { left: false, right: false, jump: false };
           stateRef.current = step(s, input);
           const cur = stateRef.current;
 
@@ -130,11 +147,12 @@ export default function GameScreen() {
               gravity: cur.player.gravityDir === 1 ? 0.15 : -0.15,
             });
           }
-          // Land: was airborne, now on ground.
+          // Land: was airborne, now on ground. Harder falls hit harder —
+          // haptic intensity scales with impact speed.
           if (!p.onGround && cur.player.onGround) {
-            playCue("land");
-            haptic("land");
             const fallSpeed = Math.abs(p.vy);
+            playCue("land");
+            haptic(fallSpeed > 8 ? "land_hard" : "land");
             if (fallSpeed > 1.5) {
               const feetY = cur.player.gravityDir === 1
                 ? cur.player.y + 28
@@ -154,6 +172,15 @@ export default function GameScreen() {
                 shakeRef.current = { ticks: 6, peak: 2.5 };
               }
             }
+          }
+          // Movement feedback: a crisp selection tick when the player
+          // starts moving from rest OR flips direction mid-run. Gives
+          // tactile confirmation that the input registered — important
+          // because movement itself is instant (no accel ramp).
+          const prevVxSign = Math.sign(p.vx);
+          const curVxSign = Math.sign(cur.player.vx);
+          if (cur.player.onGround && curVxSign !== 0 && curVxSign !== prevVxSign) {
+            haptic("move");
           }
           // Portal: teleCd goes from 0 → positive means we just teleported.
           if (p.teleCd === 0 && cur.player.teleCd > 0) {
@@ -213,6 +240,7 @@ export default function GameScreen() {
             teleCd: cur.player.teleCd,
             alive: cur.player.alive,
             keys: cur.collectedKeys.size,
+            vx: cur.player.vx,
           };
 
           if (cur.loop > prevLoop) {
@@ -328,7 +356,8 @@ export default function GameScreen() {
     stateRef.current = resetLevel(stateRef.current);
     setOutcome(null);
     setPaused(false);
-    prevRef.current = { onGround: true, vy: 0, teleCd: 0, alive: true, keys: 0 };
+    latchRef.current = { left: false, right: false, jump: false };
+    prevRef.current = { onGround: true, vy: 0, teleCd: 0, alive: true, keys: 0, vx: 0 };
     setFrame((n) => n + 1);
   };
 
@@ -375,7 +404,15 @@ export default function GameScreen() {
         />
 
         <TouchControls
-          onChange={(c) => (controlsRef.current = c)}
+          onChange={(c) => {
+            controlsRef.current = c;
+            // Latch every observed press until the engine consumes it —
+            // this is what makes even a 10 ms tap on JUMP always fire.
+            const l = latchRef.current;
+            if (c.left) l.left = true;
+            if (c.right) l.right = true;
+            if (c.jump) l.jump = true;
+          }}
           paused={paused || outcome !== null}
           oneThumb={getCachedSave().oneThumb}
           opacity={getCachedSave().controlOpacity}

@@ -104,7 +104,10 @@ export function TouchControls({ onChange, paused, oneThumb, opacity }: Props) {
   const setBtn = useCallback((id: ButtonId, v: boolean) => {
     if (stateRef.current[id] === v) return;
     stateRef.current[id] = v;
-    if (v) haptic("ui");
+    // Per-button press haptics — the JUMP button gets a punchy medium
+    // impact so the player FEELS the input land even before the engine
+    // responds; direction pads get a light selection tick.
+    if (v) haptic(id === "jump" ? "jump" : "move");
     onChangeRef.current({ ...stateRef.current });
     setPressed((p) => (p[id] === v ? p : { ...p, [id]: v }));
   }, []);
@@ -355,9 +358,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   padBtnActive: {
-    backgroundColor: "rgba(0, 229, 255, 0.25)",
+    backgroundColor: "rgba(0, 229, 255, 0.38)",
     borderColor: COLORS.cyan,
-    transform: [{ scale: 0.94 }],
+    borderWidth: 2.5,
+    transform: [{ scale: 0.9 }],
   },
   padGlyph: {
     color: COLORS.cyan,
@@ -371,8 +375,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   jumpBtnActive: {
-    backgroundColor: "rgba(157, 0, 255, 0.45)",
-    transform: [{ scale: 0.94 }],
+    backgroundColor: "rgba(157, 0, 255, 0.55)",
+    borderColor: "#D580FF",
+    borderWidth: 3,
+    transform: [{ scale: 0.9 }],
   },
   jumpLabel: {
     color: COLORS.white,

@@ -191,3 +191,10 @@ s + locked doors + guard patterns).
 * FRONT-ANGLE FIX: character.tsx introduced `lean` factor [0..1] + `faceLean = face * lean`. Idle → front-facing (eye centred, crest straight up, arms symmetric, jaw neutral); run/jump/fall/wall-slide → full profile; victory/dead → minimal (0.2); land → 0.6. Eye width also contracts in profile (5.0 → 4.2 px) + shifts ±2 px. SIM.MOVE_SPEED imported properly from constants.
 * Verified: playtest PASS 100/0; testing_agent round 4 (laser VFX, rewind ripple, AdMob config, version bump) + round 5 (front angle idle, profile running L+R, jump profile, feet planted) — all PASS. Reports: /app/test_reports/iteration_4.json, iteration_5.json.
 * Production-ready. User to run: git pull → yarn install → gradlew bundleRelease on local Windows.
+
+## Session Update — Jump Reliability + Haptics Upgrade (RESOLVED)
+* ROOT CAUSE of "jump kbhi kbhi work nahi karta": quick taps (down+up) completing between two 60Hz engine ticks never reached the engine (game loop samples controlsRef per tick in a fixed-timestep accumulator). FIXED with input latch in app/game/[id].tsx: TouchControls.onChange sets latchRef bits on every press; game loop merges live+latched into encodeInput and clears latch after ONE delivered tick. Latches cleared on pause/retry/level-change (no stale fires).
+* HAPTICS re-mapped strong (haptics.ts): jump/land = Medium impact, land_hard (fallSpeed>8) = Heavy, laser = Heavy, death = Error notification, rewind = Heavy, win = Success; NEW 'move' cue (selection tick) on start-moving / direction-flip. Per-button press haptics in controls.tsx: JUMP = Medium on finger-down, D-pad = selection tick.
+* BUTTON FEEL: D-pad pressed = scale(0.90) + borderWidth 2.5 + brighter cyan; JUMP pressed = scale(0.90) + borderWidth 3 + #D580FF border.
+* Verified: playtest PASS 100/0; testing_agent round 6 — 8/8 quick taps jumped (was dropping before), variable jump preserved (21px tap vs 102px hold), no auto-walk after release, pause-latch safety, pressed visuals measured. Report: /app/test_reports/iteration_6.json.
+* PENDING USER: verify haptic strength on physical Android device (web has no vibration API).

@@ -4,12 +4,18 @@
 // We intentionally use a light-weight in-memory flag (mirrored from save)
 // so we never hit AsyncStorage from the tick loop.
 //
-// Haptic *profiles* map game events → a specific vibration flavour:
-//   • jump / land   → light impact (subtle tactile feedback)
-//   • portal / key  → selection change (crisp UI blip)
-//   • death / laser → medium impact (feels like a hit)
-//   • rewind        → heavy impact (dramatic rewind punctuation)
-//   • win           → success notification
+// Haptic *profiles* map game events → a specific vibration flavour.
+// Tuned STRONG per user feedback ("haptic feedback strong wala chahiye"):
+//   • move         → selection tick (start moving / direction change)
+//   • jump         → medium impact (punchy, immediate)
+//   • land         → medium impact (soft touchdown)
+//   • land_hard    → heavy impact (big falls, pairs with camera shake)
+//   • portal / key → selection change (crisp UI blip)
+//   • death        → error notification buzz (unmistakable)
+//   • laser        → heavy impact (electric hit)
+//   • rewind       → heavy impact (dramatic rewind punctuation)
+//   • win          → success notification
+//   • ui           → light impact (menus)
 
 import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
@@ -24,8 +30,10 @@ export function isHapticsEnabled() {
 }
 
 export type HapticCue =
+  | "move"
   | "jump"
   | "land"
+  | "land_hard"
   | "portal"
   | "key"
   | "death"
@@ -48,18 +56,24 @@ export function haptic(cue: HapticCue) {
   lastFireMs = now;
   try {
     switch (cue) {
-      case "jump":
-      case "land":
-      case "ui":
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        break;
+      case "move":
       case "portal":
       case "key":
         Haptics.selectionAsync();
         break;
-      case "death":
-      case "laser":
+      case "ui":
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        break;
+      case "jump":
+      case "land":
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        break;
+      case "land_hard":
+      case "laser":
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        break;
+      case "death":
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         break;
       case "rewind":
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
