@@ -118,7 +118,6 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // "character always looks sideways even standing still" feedback.
   // Body/face are LOCKED to the front (camera-facing) stance in every pose.
   // Only motion effects (run trail, wrist core) follow the travel direction.
-  const lean = 0;
   const faceLean = 0;
 
   const skin = echo ? null : getCurrentSkin();
@@ -378,16 +377,13 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
             <Circle cx={elbRx} cy={elbRy} r={1.2} color={bodyShade} />
             {/* Wrist Time Core ring on the FACING arm — the gadget that
                 powers the loop. Small glowing ring + core dot. */}
-            {(() => {
-              const hx = face > 0 ? handRx : handLx;
-              const hy = face > 0 ? handRy : handLy;
-              return (
-                <Group>
-                  <Circle cx={hx} cy={hy} r={2.2} color={visor} style="stroke" strokeWidth={1.1} opacity={0.95} />
-                  <Circle cx={hx} cy={hy} r={0.9} color="#FFFFFF" opacity={0.9} />
-                </Group>
-              );
-            })()}
+            {/* Symmetric wrist rings on BOTH hands (front view). */}
+            {[[handLx, handLy], [handRx, handRy]].map(([hx, hy], i) => (
+              <Group key={i}>
+                <Circle cx={hx} cy={hy} r={2.2} color={visor} style="stroke" strokeWidth={1.1} opacity={0.95} />
+                <Circle cx={hx} cy={hy} r={0.9} color="#FFFFFF" opacity={0.9} />
+              </Group>
+            ))}
           </Group>
         );
       })()}
@@ -430,38 +426,18 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
           stance) to a narrow side-shifted slit (profile stance) as
           `lean` goes 0 → 1. This is the key reason the character looked
           permanently sideways even standing still. */}
-      {(() => {
-        // Full-front: a 5.0-wide eye centred under the visor band.
-        // Full-profile: a 4.2-wide eye shifted ~2px toward facing side.
-        const eyeW = 5.0 - 0.8 * lean;
-        const eyeH = 2.6;
-        const sideShift = faceLean * 2.0;
-        const eyeX = headCx - eyeW / 2 + sideShift;
-        return (
-          <Group>
-            <RoundedRect
-              x={eyeX}
-              y={headCy - 1.3}
-              width={eyeW}
-              height={eyeH}
-              r={1.2}
-              color="#FFFFFF"
-            />
-            <RoundedRect
-              x={eyeX + 0.2}
-              y={headCy - 1.4}
-              width={Math.max(2, eyeW - 0.4)}
-              height={eyeH + 0.2}
-              r={1.2}
-              color={visor}
-              opacity={0.9}
-            />
-          </Group>
-        );
-      })()}
+      {/* Two eyes, mirrored about the head centre — clear front-facing face. */}
+      {pose !== "dead"
+        ? [-1, 1].map((s) => (
+            <Group key={s}>
+              <Circle cx={headCx + s * 2.3} cy={headCy} r={1.5} color={visor} />
+              <Circle cx={headCx + s * 2.3} cy={headCy - 0.3} r={0.6} color="#FFFFFF" />
+            </Group>
+          ))
+        : null}
       {/* Jaw bump — fades out when front-facing; emphasises the chin on
           the facing side when profile. */}
-      <Circle cx={headCx + headR * 0.55 * faceLean} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.4 + 0.45 * lean} />
+      <Circle cx={headCx} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.4} />
 
       {/* ── RUN TRAIL — faint cyan streaks behind the runner. Drawn in
           the character so it inherits the same mirroring/flip logic.
