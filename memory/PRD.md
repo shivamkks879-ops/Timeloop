@@ -205,3 +205,4 @@ s + locked doors + guard patterns).
 - Character now fully front-facing in all poses: lean=0, arm swing vertical, run cycle = alternating foot lift (character.tsx). Playtest 100/100.
 - Front view v2: two mirrored eyes, wrist rings on both hands, centered jaw (fully symmetric). Playtest 100/100.
 - Reverted to SIDE PROFILE per user (Jun 2026): faceLean=face, 3/4 eyes toward travel dir, horizontal arm swing, mirrored when moving left. Playtest 100/100.
+- Body profile: chest plate/spine/core shifted to facing side, back pack on rear, shoulders & hips moved near centre. Playtest 100/100.

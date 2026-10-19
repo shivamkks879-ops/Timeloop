@@ -231,8 +231,10 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // and the character reads as a front-facing doll rather than a runner
   // leaning into their direction of travel.
   const shoulderY = flip ? bodyY + bodyH - 2 : bodyY + 2;
-  const shoulderLx = bodyX + 3 + faceLean;
-  const shoulderRx = bodyX + bodyW - 3 + faceLean;
+  // Profile torso: shoulders sit close to the body centre (near/far arm),
+  // biased toward the facing side.
+  const shoulderLx = cx - 2.5 + faceLean;
+  const shoulderRx = cx + 2.5 + faceLean;
   const armLen = 8;
   // Profile arm swing: arms swing forward/back along the travel direction.
   const handLy = shoulderY + (armLen + armLift) * g;
@@ -242,8 +244,8 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
 
   // Legs: hip anchors near bottom of body, feet extend down (or up).
   const hipY = flip ? bodyY + 2 : bodyY + bodyH - 2;
-  const hipLx = bodyX + 4;
-  const hipRx = bodyX + bodyW - 4;
+  const hipLx = cx - 2;
+  const hipRx = cx + 2;
   // Foot swing (run cycle) is directional — but we scale by `lean` so a
   // stationary idle character doesn't look like it's about to walk off.
   const footLxOff = legL * faceLean;
@@ -321,17 +323,19 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
 
       {/* ── BODY: dark exo-suit + chest armor plate + energy seams ── */}
       <RoundedRect x={bodyX} y={bodyY} width={bodyW} height={bodyH} r={5} color={bodyShade} />
+      {/* Back pack on the rear side — makes the torso read in profile */}
+      <RoundedRect x={face > 0 ? bodyX - 2 : bodyX + bodyW - 1} y={bodyY + 2} width={3} height={bodyH * 0.55} r={1.2} color={bodyShade} />
       {/* Chest armor plate (lighter, sits over the suit) */}
       <RoundedRect
-        x={bodyX + 2}
+        x={bodyX + 2 + face * 1.5}
         y={bodyY + 1.5}
-        width={bodyW - 4}
+        width={bodyW - 5}
         height={bodyH * 0.62}
         r={4}
         color={bodyMain}
       />
       {/* Tron-style energy seams — vertical spine + waist band */}
-      <Rect x={cx - 0.5} y={bodyY + 2} width={1} height={bodyH - 4} color={visor} opacity={0.75} />
+      <Rect x={cx - 0.5 + face * 2.5} y={bodyY + 2} width={1} height={bodyH - 4} color={visor} opacity={0.75} />
       <Rect x={bodyX + 2} y={bodyY + bodyH * 0.62} width={bodyW - 4} height={1} color={visor} opacity={0.55} />
 
       {/* ── TIME CORE — pulsing chest orb. Beats faster as the loop
@@ -342,11 +346,11 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
         const pulse = 0.55 + 0.45 * Math.abs(Math.sin(frame * pulseSpeed));
         return (
           <Group>
-            <Circle cx={cx} cy={bodyY + bodyH * 0.38} r={3.4} color={visor} opacity={0.35 * pulse}>
+            <Circle cx={cx + face * 2} cy={bodyY + bodyH * 0.38} r={3.4} color={visor} opacity={0.35 * pulse}>
               {!echo ? <Blur blur={3} /> : null}
             </Circle>
-            <Circle cx={cx} cy={bodyY + bodyH * 0.38} r={2.2} color={visor} opacity={pulse} />
-            <Circle cx={cx} cy={bodyY + bodyH * 0.38} r={0.9} color="#FFFFFF" opacity={pulse} />
+            <Circle cx={cx + face * 2} cy={bodyY + bodyH * 0.38} r={2.2} color={visor} opacity={pulse} />
+            <Circle cx={cx + face * 2} cy={bodyY + bodyH * 0.38} r={0.9} color="#FFFFFF" opacity={pulse} />
           </Group>
         );
       })()}
