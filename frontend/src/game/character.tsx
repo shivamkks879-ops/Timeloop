@@ -125,7 +125,9 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
       : pose === "victory" || pose === "dead"
       ? 0.2
       : movingAbs * 0.5;     // idle: 0 at rest, up to 0.5 if drifting
-  const lean = Math.max(0, Math.min(1, leanTarget));
+  // Capped so the character always reads front-facing; run/jump only adds a
+  // subtle lean in the travel direction (no full side profile).
+  const lean = Math.max(0, Math.min(1, leanTarget)) * 0.35;
   // Signed lean used wherever an asymmetric offset is wanted.
   const faceLean = face * lean;
 

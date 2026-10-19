@@ -198,3 +198,7 @@ s + locked doors + guard patterns).
 * BUTTON FEEL: D-pad pressed = scale(0.90) + borderWidth 2.5 + brighter cyan; JUMP pressed = scale(0.90) + borderWidth 3 + #D580FF border.
 * Verified: playtest PASS 100/0; testing_agent round 6 — 8/8 quick taps jumped (was dropping before), variable jump preserved (21px tap vs 102px hold), no auto-walk after release, pause-latch safety, pressed visuals measured. Report: /app/test_reports/iteration_6.json.
 * PENDING USER: verify haptic strength on physical Android device (web has no vibration API).
+
+## Jun 2026 update
+- Character lean capped at 0.35 (character.tsx) — always front-facing, subtle lean when running.
+- Difficulty: added 1 floor spike (^) to 13 levels (5-2,5-5,5-8,5-10,6-7,6-10,6-12,7-4,7-9,7-13,8-4,8-9,8-13). Headless playtest PASS 100/100.
