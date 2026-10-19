@@ -204,3 +204,4 @@ s + locked doors + guard patterns).
 - Difficulty: added 1 floor spike (^) to 13 levels (5-2,5-5,5-8,5-10,6-7,6-10,6-12,7-4,7-9,7-13,8-4,8-9,8-13). Headless playtest PASS 100/100.
 - Character now fully front-facing in all poses: lean=0, arm swing vertical, run cycle = alternating foot lift (character.tsx). Playtest 100/100.
 - Front view v2: two mirrored eyes, wrist rings on both hands, centered jaw (fully symmetric). Playtest 100/100.
+- Reverted to SIDE PROFILE per user (Jun 2026): faceLean=face, 3/4 eyes toward travel dir, horizontal arm swing, mirrored when moving left. Playtest 100/100.

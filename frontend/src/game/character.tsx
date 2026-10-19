@@ -116,9 +116,10 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // We multiply every `face`-dependent offset by `lean`, so toggling
   // the pose automatically re-centres the character. This fixes the
   // "character always looks sideways even standing still" feedback.
-  // Body/face are LOCKED to the front (camera-facing) stance in every pose.
-  // Only motion effects (run trail, wrist core) follow the travel direction.
-  const faceLean = 0;
+  // Side-scroller profile: the body faces the direction of travel
+  // (face = +1 right / default idle, -1 left). Every asymmetric offset is
+  // multiplied by `faceLean`, which mirrors the whole robot when moving left.
+  const faceLean = face;
 
   const skin = echo ? null : getCurrentSkin();
   const bodyMain = echo ? ECHO_BODY : pose === "dead" ? RED : (skin?.bodyMain ?? BODY_LIGHT);
@@ -233,12 +234,11 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   const shoulderLx = bodyX + 3 + faceLean;
   const shoulderRx = bodyX + bodyW - 3 + faceLean;
   const armLen = 8;
-  // Front view: arm swing is vertical (hands rise/fall alternately) instead
-  // of sideways, so arms never point toward the travel direction.
-  const handLy = shoulderY + (armLen + armLift + armL * 0.6) * g;
-  const handRy = shoulderY + (armLen + armLift + armR * 0.6) * g;
-  const armLxOff = 0;
-  const armRxOff = 0;
+  // Profile arm swing: arms swing forward/back along the travel direction.
+  const handLy = shoulderY + (armLen + armLift) * g;
+  const handRy = shoulderY + (armLen + armLift) * g;
+  const armLxOff = armL * face + face * 1.2;
+  const armRxOff = armR * face + face * 1.2;
 
   // Legs: hip anchors near bottom of body, feet extend down (or up).
   const hipY = flip ? bodyY + 2 : bodyY + bodyH - 2;
@@ -426,18 +426,19 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
           stance) to a narrow side-shifted slit (profile stance) as
           `lean` goes 0 → 1. This is the key reason the character looked
           permanently sideways even standing still. */}
-      {/* Two eyes, mirrored about the head centre — clear front-facing face. */}
+      {/* 3/4 profile eyes: near eye large on the facing side, far eye
+          smaller toward the centre — the gaze points where the robot walks. */}
       {pose !== "dead"
-        ? [-1, 1].map((s) => (
-            <Group key={s}>
-              <Circle cx={headCx + s * 2.3} cy={headCy} r={1.5} color={visor} />
-              <Circle cx={headCx + s * 2.3} cy={headCy - 0.3} r={0.6} color="#FFFFFF" />
+        ? [{ dx: 3.2, r: 1.6 }, { dx: 0.3, r: 1.1 }].map((e, i) => (
+            <Group key={i}>
+              <Circle cx={headCx + face * e.dx} cy={headCy} r={e.r} color={visor} />
+              <Circle cx={headCx + face * (e.dx + 0.3)} cy={headCy - 0.3} r={e.r * 0.4} color="#FFFFFF" />
             </Group>
           ))
         : null}
       {/* Jaw bump — fades out when front-facing; emphasises the chin on
           the facing side when profile. */}
-      <Circle cx={headCx} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.4} />
+      <Circle cx={headCx + headR * 0.55 * face} cy={headCy + headR * 0.35} r={1.4} color={bodyShade} opacity={0.85} />
 
       {/* ── RUN TRAIL — faint cyan streaks behind the runner. Drawn in
           the character so it inherits the same mirroring/flip logic.
