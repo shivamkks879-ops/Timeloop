@@ -26,7 +26,7 @@ import {
   Skia,
 } from "@shopify/react-native-skia";
 
-import { COLORS, SIM } from "./constants";
+import { COLORS } from "./constants";
 import { PLAYER_H, PLAYER_W } from "./engine";
 import { getCurrentSkin } from "./skins";
 import type { PlayerState } from "./types";
@@ -116,20 +116,10 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // We multiply every `face`-dependent offset by `lean`, so toggling
   // the pose automatically re-centres the character. This fixes the
   // "character always looks sideways even standing still" feedback.
-  const movingAbs = Math.min(1, Math.abs(actor.vx) / SIM.MOVE_SPEED);
-  const leanTarget =
-    pose === "run" || pose === "jump" || pose === "fall" || pose === "wall_slide"
-      ? 1
-      : pose === "land"
-      ? 0.6
-      : pose === "victory" || pose === "dead"
-      ? 0.2
-      : movingAbs * 0.5;     // idle: 0 at rest, up to 0.5 if drifting
-  // Capped so the character always reads front-facing; run/jump only adds a
-  // subtle lean in the travel direction (no full side profile).
-  const lean = Math.max(0, Math.min(1, leanTarget)) * 0.35;
-  // Signed lean used wherever an asymmetric offset is wanted.
-  const faceLean = face * lean;
+  // Body/face are LOCKED to the front (camera-facing) stance in every pose.
+  // Only motion effects (run trail, wrist core) follow the travel direction.
+  const lean = 0;
+  const faceLean = 0;
 
   const skin = echo ? null : getCurrentSkin();
   const bodyMain = echo ? ECHO_BODY : pose === "dead" ? RED : (skin?.bodyMain ?? BODY_LIGHT);
@@ -244,14 +234,12 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   const shoulderLx = bodyX + 3 + faceLean;
   const shoulderRx = bodyX + bodyW - 3 + faceLean;
   const armLen = 8;
-  const handLy = shoulderY + (armLen + armLift) * g;
-  const handRy = shoulderY + (armLen + armLift) * g;
-  // Swing offset from the pose system PLUS a forward bias that fades
-  // out as the character returns to rest (so the arms stop pointing
-  // toward "the way I was walking" when I come to a stop).
-  const armFwd = faceLean * 1.2;
-  const armLxOff = armL * face + armFwd;
-  const armRxOff = armR * face + armFwd;
+  // Front view: arm swing is vertical (hands rise/fall alternately) instead
+  // of sideways, so arms never point toward the travel direction.
+  const handLy = shoulderY + (armLen + armLift + armL * 0.6) * g;
+  const handRy = shoulderY + (armLen + armLift + armR * 0.6) * g;
+  const armLxOff = 0;
+  const armRxOff = 0;
 
   // Legs: hip anchors near bottom of body, feet extend down (or up).
   const hipY = flip ? bodyY + 2 : bodyY + bodyH - 2;
@@ -261,8 +249,12 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
   // stationary idle character doesn't look like it's about to walk off.
   const footLxOff = legL * faceLean;
   const footRxOff = legR * faceLean;
-  const legLpath = line(hipLx, hipY, hipLx + footLxOff, footBaseY);
-  const legRpath = line(hipRx, hipY, hipRx + footRxOff, footBaseY);
+  // Front-view run cycle: feet lift alternately (knee-up) instead of
+  // swinging sideways.
+  const footLy = footBaseY - (pose === "run" ? Math.max(0, legL) * 0.6 : 0) * g;
+  const footRy = footBaseY - (pose === "run" ? Math.max(0, legR) * 0.6 : 0) * g;
+  const legLpath = line(hipLx, hipY, hipLx + footLxOff, footLy);
+  const legRpath = line(hipRx, hipY, hipRx + footRxOff, footRy);
 
   // Hood-crest sway reuses the old antenna sway variable so idle/run
   // animation phases stay in sync with the rest of the pose system.
@@ -320,13 +312,13 @@ export function RobotSprite({ actor, frame, pose, echo, echoAlive, timeFrac }: P
       <Path path={legLpath} color={bodyShade} style="stroke" strokeWidth={3.4} strokeCap="round" />
       <Path path={legRpath} color={bodyShade} style="stroke" strokeWidth={3.4} strokeCap="round" />
       {/* Knee guards — small plates at the midpoint of each leg */}
-      <Circle cx={(hipLx + hipLx + footLxOff) / 2} cy={(hipY + footBaseY) / 2} r={1.7} color={bodyMain} />
-      <Circle cx={(hipRx + hipRx + footRxOff) / 2} cy={(hipY + footBaseY) / 2} r={1.7} color={bodyMain} />
+      <Circle cx={(hipLx + hipLx + footLxOff) / 2} cy={(hipY + footLy) / 2} r={1.7} color={bodyMain} />
+      <Circle cx={(hipRx + hipRx + footRxOff) / 2} cy={(hipY + footRy) / 2} r={1.7} color={bodyMain} />
       {/* Thruster boots — rounded armor cap + cyan sole strip */}
-      <RoundedRect x={hipLx + footLxOff - 3.2} y={footBaseY - 2 * g - (g > 0 ? 0 : 4)} width={6.4} height={4} r={1.6} color={bodyMain} />
-      <RoundedRect x={hipRx + footRxOff - 3.2} y={footBaseY - 2 * g - (g > 0 ? 0 : 4)} width={6.4} height={4} r={1.6} color={bodyMain} />
-      <Rect x={hipLx + footLxOff - 3.2} y={flip ? footBaseY - 2 : footBaseY + 0.6} width={6.4} height={1.4} color={visor} opacity={0.9} />
-      <Rect x={hipRx + footRxOff - 3.2} y={flip ? footBaseY - 2 : footBaseY + 0.6} width={6.4} height={1.4} color={visor} opacity={0.9} />
+      <RoundedRect x={hipLx + footLxOff - 3.2} y={footLy - 2 * g - (g > 0 ? 0 : 4)} width={6.4} height={4} r={1.6} color={bodyMain} />
+      <RoundedRect x={hipRx + footRxOff - 3.2} y={footRy - 2 * g - (g > 0 ? 0 : 4)} width={6.4} height={4} r={1.6} color={bodyMain} />
+      <Rect x={hipLx + footLxOff - 3.2} y={flip ? footLy - 2 : footLy + 0.6} width={6.4} height={1.4} color={visor} opacity={0.9} />
+      <Rect x={hipRx + footRxOff - 3.2} y={flip ? footRy - 2 : footRy + 0.6} width={6.4} height={1.4} color={visor} opacity={0.9} />
 
       {/* ── BODY: dark exo-suit + chest armor plate + energy seams ── */}
       <RoundedRect x={bodyX} y={bodyY} width={bodyW} height={bodyH} r={5} color={bodyShade} />

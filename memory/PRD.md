@@ -202,3 +202,4 @@ s + locked doors + guard patterns).
 ## Jun 2026 update
 - Character lean capped at 0.35 (character.tsx) — always front-facing, subtle lean when running.
 - Difficulty: added 1 floor spike (^) to 13 levels (5-2,5-5,5-8,5-10,6-7,6-10,6-12,7-4,7-9,7-13,8-4,8-9,8-13). Headless playtest PASS 100/100.
+- Character now fully front-facing in all poses: lean=0, arm swing vertical, run cycle = alternating foot lift (character.tsx). Playtest 100/100.
