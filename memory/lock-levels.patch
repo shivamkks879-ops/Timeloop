@@ -1,0 +1,25 @@
+--- a/frontend/app/game/[id].tsx
++++ b/frontend/app/game/[id].tsx
+@@ -21,7 +21,7 @@
+ } from "@/src/game/engine";
+ import { HUD } from "@/src/game/hud";
+ import { getLevel, nextLevelId } from "@/src/game/levels";
+-import { bumpDeathStat, bumpPlaytime, getCachedSave, recordLevelResult } from "@/src/game/save";
++import { bumpDeathStat, bumpPlaytime, getCachedSave, isLevelUnlocked, loadSave, recordLevelResult } from "@/src/game/save";
+ import { playCue } from "@/src/game/audio";
+ import { haptic } from "@/src/game/haptics";
+ import { spawnBurst } from "@/src/game/particles";
+@@ -42,6 +42,13 @@
+   const levelId = String(params.id ?? "1-1");
+   const level = getLevel(levelId);
+ 
++  // Block direct links to levels the player hasn't unlocked yet.
++  useEffect(() => {
++    loadSave().then((save) => {
++      if (!isLevelUnlocked(save, levelId)) router.replace("/levels");
++    });
++  }, [levelId, router]);
++
+   const [size, setSize] = useState({ w: 0, h: 0 });
+   const [paused, setPaused] = useState(false);
+   const [outcome, setOutcome] = useState<null | { kind: "won" | "dead"; loops: number; grade?: "S" | "A" | "B" | "C"; stars?: number }>(null);
