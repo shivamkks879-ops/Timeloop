@@ -1,0 +1,167 @@
+--- a/backend/routes/legal.py
++++ b/backend/routes/legal.py
+@@ -80,12 +80,11 @@
+ This policy explains what data the App collects, why it collects it, and how it is stored.</p>
+ 
+ <h2>1. Data we do NOT collect</h2>
+-<p>Time Loop Escape is a <strong>fully offline single-player game</strong>. We do not collect,
++<p>Time Loop Escape is a <strong>single-player game</strong>. Apart from the advertising described in section 5, we do not collect,
+ transmit, or store on any server:</p>
+ <ul>
+   <li>Personal information (name, email address, phone number).</li>
+   <li>Contacts, photos, camera, microphone, or location data.</li>
+-  <li>Analytics identifiers, advertising IDs, or third-party trackers.</li>
+   <li>Any information that could identify you personally.</li>
+ </ul>
+ 
+@@ -106,23 +105,24 @@
+ <ul>
+   <li><strong>VIBRATE</strong> &mdash; for haptic feedback on jumps, deaths, and rewinds. Can be turned off in Settings.</li>
+ </ul>
+-<p>No network permissions are required for gameplay. The App does not open sockets or make
+-outbound requests during play. Standard Android runtime libraries may still perform routine
++<ul>
++  <li><strong>INTERNET / ACCESS_NETWORK_STATE</strong> &mdash; used only to load ads. Gameplay itself works offline.</li>
++  <li><strong>AD_ID</strong> &mdash; lets Google AdMob read the advertising ID (you can reset or delete it in Android Settings &rarr; Privacy &rarr; Ads).</li>
++</ul>
++<p>No gameplay data is sent over the network. Standard Android runtime libraries may still perform routine
+ system checks; no gameplay data is transmitted through them.</p>
+ 
+ <h2>4. Children&rsquo;s privacy</h2>
+-<p>The App is rated for everyone and contains no advertising, in-app purchases, chat,
+-user-generated content, or social features. It complies with Google Play&rsquo;s Families policy
+-and is safe for players of all ages.</p>
+-
+-<h2>5. Third-party services</h2>
+-<p>No third-party analytics, advertising, or crash-reporting services are integrated in the
+-current release. Should any be added in a future version, this policy will be updated and a
+-clear in-app notice shown before any data leaves your device.</p>
++<p>The App is rated for everyone and contains no in-app purchases, chat,
++user-generated content, or social features. It <strong>does show ads</strong> served by Google AdMob.
++We do not knowingly collect personal information from children.</p>
++
++<h2>5. Advertising (third-party services)</h2>
++<p>Google AdMob (Google LLC) shows ads in the App. To serve, limit and measure ads, AdMob may collect your device's advertising ID, IP address, approximate location, device and app information, and ad interaction data. See Google's policy: <a href="https://policies.google.com/technologies/ads">policies.google.com/technologies/ads</a>.</p>
++<p>No other third-party analytics or crash-reporting services are integrated.</p>
+ 
+ <h2>6. Data retention &amp; deletion</h2>
+-<p>Because no data is collected on our servers, there is nothing for us to retain or delete
+-about you. Any local data can be removed instantly by uninstalling the App or by using
++<p>We do not run our own servers that store your data. Ad data is handled by Google under its own policy. Any local data can be removed instantly by uninstalling the App or by using
+ <strong>Settings &rarr; Reset Progress</strong>.</p>
+ 
+ <h2>7. Changes to this policy</h2>
+@@ -182,7 +182,7 @@
+   <li><a href="/api/legal/privacy"><strong>Privacy Policy</strong></a> &mdash; what data the game does and does not collect.</li>
+   <li><a href="/api/legal/terms"><strong>Terms of Service</strong></a> &mdash; the rules for using the game.</li>
+ </ul>
+-<p class="muted">All game data is stored locally on your device. Nothing is transmitted to any server.</p>
++<p class="muted">All game data is stored locally on your device. The game shows ads served by Google AdMob.</p>
+ """
+ 
+ 
+--- a/frontend/app/privacy.tsx
++++ b/frontend/app/privacy.tsx
+@@ -35,13 +35,12 @@
+ 
+         <Text style={styles.h2}>1. Data we do NOT collect</Text>
+         <Text style={styles.p}>
+-          Time Loop Escape is a <Text style={styles.b}>fully offline single-player game</Text>.
+-          We do not collect, transmit, or store on any server:
++          Time Loop Escape is a <Text style={styles.b}>single-player game</Text>. Apart from the
++          advertising described in section 5, we do not collect, transmit, or store on any server:
+         </Text>
+         {[
+           "Personal information (name, email address, phone number).",
+           "Contacts, photos, camera, microphone, or location data.",
+-          "Analytics identifiers, advertising IDs, or third-party trackers.",
+           "Any information that could identify you personally.",
+         ].map((s, i) => (
+           <Text key={i} style={styles.li}>• {s}</Text>
+@@ -71,28 +70,28 @@
+         </Text>
+         <Text style={styles.li}>• <Text style={styles.b}>VIBRATE</Text> — for haptic feedback on jumps, deaths, and rewinds. Can be turned off in Settings.</Text>
+         <Text style={styles.p}>
+-          No network permissions are required for gameplay. The App does not open sockets or
+-          make outbound requests during play.
++          INTERNET / ACCESS_NETWORK_STATE are used only to load ads, and AD_ID lets Google AdMob
++          read the advertising ID (reset it in Android Settings → Privacy → Ads). Gameplay works
++          offline and no gameplay data is sent over the network.
+         </Text>
+ 
+         <Text style={styles.h2}>4. Children&apos;s privacy</Text>
+         <Text style={styles.p}>
+-          The App is rated for everyone and contains no advertising, in-app purchases, chat,
+-          user-generated content, or social features. It complies with Google Play&apos;s Families
+-          policy and is safe for players of all ages.
++          The App is rated for everyone and contains no in-app purchases, chat,
++          user-generated content, or social features. It does show ads served by Google AdMob.
++          We do not knowingly collect personal information from children.
+         </Text>
+ 
+-        <Text style={styles.h2}>5. Third-party services</Text>
++        <Text style={styles.h2}>5. Advertising (third-party services)</Text>
+         <Text style={styles.p}>
+-          No third-party analytics, advertising, or crash-reporting services are integrated
+-          in the current release. Should any be added in a future version, this policy will
+-          be updated and a clear in-app notice shown before any data leaves your device.
++          Google AdMob (Google LLC) shows ads in the App. To serve, limit and measure ads, AdMob may collect your device&apos;s advertising ID, IP address, approximate location, device and app information, and ad interaction data. See Google&apos;s policy: https://policies.google.com/technologies/ads. No other third-party
++          analytics or crash-reporting services are integrated.
+         </Text>
+ 
+         <Text style={styles.h2}>6. Data retention & deletion</Text>
+         <Text style={styles.p}>
+-          Because no data is collected on our servers, there is nothing for us to retain or
+-          delete about you. Any local data can be removed instantly by uninstalling the App
++          We do not run our own servers that store your data. Ad data is handled by
++          Google under its own policy. Any local data can be removed instantly by uninstalling the App
+           or by using Settings → Reset Progress.
+         </Text>
+ 
+--- a/frontend/store/PRIVACY.md
++++ b/frontend/store/PRIVACY.md
+@@ -7,11 +7,10 @@
+ it is stored.
+ 
+ ## 1. Data we do NOT collect
+-Time Loop Escape is **fully offline**. We do NOT collect, transmit, or
+-store on any server:
++Time Loop Escape is a single-player game. Apart from the advertising in
++section 5, we do NOT collect, transmit, or store on any server:
+ - Personal information (name, email, phone).
+ - Contacts, photos, camera, microphone, or location data.
+-- Analytics, advertising identifiers, or third-party trackers.
+ - Any information that could identify you personally.
+ 
+ ## 2. Data we DO store — locally on your device only
+@@ -33,19 +32,19 @@
+ Time Loop Escape declares only the minimum Android permissions required
+ to run:
+ - **Vibration** — for haptic feedback (can be toggled off in Settings).
+-No network permissions are declared for gameplay. Emergency system
+-libraries may open sockets during the app’s startup for updates; no
+-game data is transmitted through them.
++- **Internet / network state** — used only to load ads. Gameplay works offline.
++- **Advertising ID (AD_ID)** — lets Google AdMob read the advertising ID
++  (reset it in Android Settings → Privacy → Ads).
++No gameplay data is sent over the network.
+ 
+ ## 4. Children's privacy
+-The App is rated for everyone and contains no advertising, in-app
+-purchases, chat, or user-generated content. It is safe for players of
+-all ages.
+-
+-## 5. Third-party services
+-No third-party analytics, advertising, or crash-reporting services are
+-integrated in this release. Should any be added in a future version,
+-this policy will be updated and a notice shown in-app.
++The App is rated for everyone and contains no in-app purchases, chat, or
++user-generated content. It does show ads served by Google AdMob. We do
++not knowingly collect personal information from children.
++
++## 5. Advertising (third-party services)
++Google AdMob (Google LLC) shows ads in the App. To serve, limit and measure ads, AdMob may collect your device's advertising ID, IP address, approximate location, device and app information, and ad interaction data. See Google's policy: https://policies.google.com/technologies/ads.
++No other third-party analytics or crash-reporting services are integrated.
+ 
+ ## 6. Changes to this policy
+ Any changes will be announced in the release notes on the Google Play
