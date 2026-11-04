@@ -1,0 +1,38 @@
+--- a/frontend/src/game/constants.ts
++++ b/frontend/src/game/constants.ts
+@@ -17,6 +17,13 @@
+   echoTint: "rgba(157, 0, 255, 0.55)",
+ };
+ 
++// Colour-blind safe overrides (Okabe-Ito): hazards orange, goals/keys yellow.
++export const SAFE_COLORS: Partial<typeof COLORS> = {
++  red: "#FF8A00",
++  green: "#F0E442",
++  purple: "#CC79A7",
++};
++
+ // Simulation constants (deterministic, tick-based)
+ export const SIM = {
+   TPS: 60,               // ticks per second (fixed timestep)
+--- a/frontend/src/game/renderer.tsx
++++ b/frontend/src/game/renderer.tsx
+@@ -15,12 +15,18 @@
+   Blur, vec, LinearGradient,
+ } from "@shopify/react-native-skia";
+ 
+-import { COLORS, SIM } from "./constants";
++import { COLORS as BASE_COLORS, SAFE_COLORS, SIM } from "./constants";
++import { getCachedSave } from "./save";
+ import type { EngineState, Actor } from "./engine";
+ import { PLAYER_W, PLAYER_H } from "./engine";
+ import { RobotSprite, derivePose, type Pose } from "./character";
+ import { getLiveParticles } from "./particles";
+ 
++// Swaps hazard/goal hues when the colour-safe setting is on.
++const COLORS = new Proxy(BASE_COLORS, {
++  get: (t, k: string) => (getCachedSave().colorSafe && k in SAFE_COLORS ? (SAFE_COLORS as any)[k] : (t as any)[k]),
++}) as typeof BASE_COLORS;
++
+ interface Props {
+   state: EngineState;
+   width: number;
