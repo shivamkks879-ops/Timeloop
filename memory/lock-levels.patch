@@ -16,10 +16,57 @@
 +  // Block direct links to levels the player hasn't unlocked yet.
 +  useEffect(() => {
 +    loadSave().then((save) => {
-+      if (!isLevelUnlocked(save, levelId)) router.replace("/levels");
++      if (!isLevelUnlocked(save, levelId)) router.replace({ pathname: "/levels", params: { locked: "1" } });
 +    });
 +  }, [levelId, router]);
 +
    const [size, setSize] = useState({ w: 0, h: 0 });
    const [paused, setPaused] = useState(false);
    const [outcome, setOutcome] = useState<null | { kind: "won" | "dead"; loops: number; grade?: "S" | "A" | "B" | "C"; stars?: number }>(null);
+--- a/frontend/app/levels.tsx
++++ b/frontend/app/levels.tsx
+@@ -1,7 +1,7 @@
+ // Level select — grouped by world with headers, scrollable.
+ // Locked levels are dimmed with a lock; unlocked levels show star grades.
+ 
+-import { useRouter } from "expo-router";
++import { useLocalSearchParams, useRouter } from "expo-router";
+ import React, { useEffect, useMemo, useState } from "react";
+ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+ import { SafeAreaView } from "react-native-safe-area-context";
+@@ -28,6 +28,7 @@
+ export default function LevelSelect() {
+   const router = useRouter();
+   const [, setTick] = useState(0);
++  const { locked } = useLocalSearchParams<{ locked?: string }>();
+ 
+   useEffect(() => {
+     loadSave().then(() => setTick((n) => n + 1));
+@@ -60,6 +61,12 @@
+           <View style={{ width: 88 }} />
+         </View>
+ 
++        {locked === "1" && (
++          <Text testID="locked-level-notice" style={styles.lockedNotice}>
++            Clear the previous level first to unlock that one.
++          </Text>
++        )}
++
+         <ScrollView
+           contentContainerStyle={styles.scrollContent}
+           showsVerticalScrollIndicator={false}
+@@ -142,6 +149,14 @@
+ }
+ 
+ const styles = StyleSheet.create({
++  lockedNotice: {
++    color: COLORS.red,
++    textAlign: "center",
++    fontSize: 13,
++    fontWeight: "700",
++    letterSpacing: 1,
++    marginBottom: 8,
++  },
+   root: { flex: 1, backgroundColor: COLORS.bg },
+   safe: { flex: 1, padding: 20 },
+   header: {
