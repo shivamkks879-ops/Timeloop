@@ -36,3 +36,33 @@
  interface Props {
    state: EngineState;
    width: number;
+@@ -75,6 +81,9 @@
+               <Path path={path} color={COLORS.red} style="stroke" strokeWidth={1.5}>
+                 <Blur blur={2.5} />
+               </Path>
++              {getCachedSave().colorSafe && (
++                <Path path={path} color="#000000" style="stroke" strokeWidth={2} />
++              )}
+             </Group>
+           );
+         } else if (t === "G") {
+@@ -395,6 +404,19 @@
+         </Rect>
+         {/* Mid-opacity beam body */}
+         <Rect x={px0} y={py0} width={bw} height={bh} color={COLORS.red} opacity={0.9} />
++        {/* Colour-safe: black stripes so the beam reads as danger without colour */}
++        {getCachedSave().colorSafe &&
++          Array.from({ length: Math.floor(len / 10) }, (_, k) => (
++            <Rect
++              key={k}
++              x={isVertical ? px0 : px0 + k * 10 + 3}
++              y={isVertical ? py0 + k * 10 + 3 : py0}
++              width={isVertical ? bw : 4}
++              height={isVertical ? 4 : bh}
++              color="#000000"
++              opacity={0.75}
++            />
++          ))}
+         {/* Bright white-hot core — flickers between red & white */}
+         <Rect
+           x={cx1}
