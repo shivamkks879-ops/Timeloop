@@ -86,3 +86,8 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+*.jks
+*.apk
+*.aab
+frontend/android/app/release/
